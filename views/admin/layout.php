@@ -32,10 +32,19 @@ $groups = [
 ];
 $extra = [];
 foreach (Alien\Services\Modules::all() as $mid => $mod) {
-    if ($mod['link'] && $mid !== 'stats' && Alien\Services\Modules::on($mid)) {
+    if ($mod['link'] && !in_array($mid, ['stats', 'einvoice'], true) && Alien\Services\Modules::on($mid)) {
         $map = ['abandoned_cart' => 'abandoned'];
         $extra[$map[$mid] ?? $mid] = [$mod['link'], $mod['name'], 'M12 5v14M5 12h14'];
     }
+}
+if (Alien\Services\Modules::on('einvoice')) {
+    $acc = [
+        'einvoice' => ['admin/einvoice', __('Fatture elettroniche'), 'M14 3H6a2 2 0 00-2 2v14a2 2 0 002 2h12a2 2 0 002-2V9zM14 3v6h6M9 13h6M9 17h6'],
+        'purchases' => ['admin/purchases', __('Fatture ricevute'), 'M12 3v12M7 10l5 5 5-5M5 21h14'],
+        'expenses' => ['admin/expenses', __('Spese'), 'M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6'],
+        'accounting' => ['admin/accounting', __('Contabilità'), 'M3 3v18h18M7 15l4-4 3 3 5-6'],
+    ];
+    $groups = array_slice($groups, 0, 2, true) + [__('Contabilità') => $acc] + array_slice($groups, 2, null, true);
 }
 if ($extra) {
     $groups = array_slice($groups, 0, 3, true) + [__('Estensioni attive') => $extra] + array_slice($groups, 3, null, true);

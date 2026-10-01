@@ -8,7 +8,7 @@ use Alien\Core\Settings;
 
 final class Migrator
 {
-    public const VERSION = 2;
+    public const VERSION = 3;
 
     private const COLUMNS = [
         ['products', 'rating_avg', 'INTEGER NOT NULL DEFAULT 0'],
@@ -16,6 +16,7 @@ final class Migrator
         ['orders', 'invoice_number', "VARCHAR(30) NOT NULL DEFAULT ''"],
         ['orders', 'invoice_date', 'VARCHAR(19)'],
         ['orders', 'review_asked', 'INTEGER NOT NULL DEFAULT 0'],
+        ['orders', 'tax_rate', 'INTEGER'],
     ];
 
     public static function needed(): bool

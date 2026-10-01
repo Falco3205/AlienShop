@@ -10,7 +10,7 @@ PHP 8.1+ senza dipendenze, PDO con SQLite o MySQL. Il front controller è `publi
 
 | Percorso | Contenuto |
 |---|---|
-| `app/Core` | App (routing, cache pagine, errori), Config, DB, Request/Response/Router, Session, Csrf, Auth, Settings, View (con fallback tema → `_base`), Lang, Money, Str, ImageProcessor (GD→WebP), Http (cURL + anti-SSRF, reset password, rimborsi, IVA per paese, log 404, immagine principale, Analytics, pagine legali, statistiche, recensioni, newsletter, carrelli abbandonati, fatture, avvisi disponibilità, Mollie, filtri, backup), Mailer (mail/SMTP), Cache |
+| `app/Core` | App (routing, cache pagine, errori), Config, DB, Request/Response/Router, Session, Csrf, Auth, Settings, View (con fallback tema → `_base`), Lang, Money, Str, ImageProcessor (GD→WebP), Http (cURL + anti-SSRF, reset password, rimborsi, IVA per paese, log 404, immagine principale, Analytics, pagine legali, statistiche, recensioni, newsletter, carrelli abbandonati, fatture, avvisi disponibilità, Mollie, filtri, backup, fatturazione elettronica con server PEC simulato, contabilità), Mailer (mail/SMTP), Cache |
 | `app/Services` | Catalog (prodotti, attributi, varianti, categorie), Cart, Coupons, Shipping, Orders, Redirects, Seo, Sitemap, IndexNow, Themes, Installer, Demo |
 | `app/Payments` | `Gateway` astratto, Stripe, PayPal, Bank, Cod, `Registry` (auto-discovery di `*Gateway.php`) |
 | `app/Import` | CsvReader, Writer, WooImporter, ShopifyImporter, Exporter, Result |
@@ -45,6 +45,8 @@ PHP 8.1+ senza dipendenze, PDO con SQLite o MySQL. Il front controller è `publi
 
 **PDF.** `Core\Pdf` scrive PDF 1.4 con Helvetica standard (WinAnsi, tabelle di larghezze incluse): testo, linee, rettangoli, a capo e pagine multiple. `Invoices::pdf()` compone il documento; `Mailer::send()` supporta allegati.
 
+**Fatturazione elettronica.** `EInvoice\InvoiceData` converte un ordine in dati fattura (righe nette, sconto come riga negativa, spedizione, arrotondamento riportato in `DatiRiepilogo`, aliquota da `orders.tax_rate`); `XmlBuilder` scrive il FatturaPA 1.2.2 e lo valida con `schema/FatturaPA_v1.2.2.xsd` (copia locale dell'XSD ufficiale + xmldsig, nessun accesso di rete). Tutti i testi passano da `Fiscal::basicLatin` perché lo schema ammette solo Basic Latin e Latin-1. `Services\EInvoices` emette (tabella `einvoices`, XML in `storage/einvoice/out`, nome file `IT<P.IVA>_<progressivo base36>.xml`), invia, rigenera dopo uno scarto (stesso numero, nuovo progressivo) e emette note di credito. `Services\Sdi` usa `Mailer::sendSmtp` per l'invio alla PEC di SdI e un client `EInvoice\Imap` su socket per leggere la casella; `EInvoice\Mime` apre le buste PEC (anche `postacert.eml` annidato) e `EInvoice\P7m` estrae l'XML dai file firmati (openssl, con ripiego sulla ricerca dei byte). `XmlParser` legge le fatture ricevute in `purchase_invoices` (dedupe per fornitore/numero/data/tipo, XML in `storage/einvoice/in`). Le credenziali PEC sono cifrate con `Core\Secret` (libsodium, chiave derivata da `app.key`). `Services\Accounting` costruisce registri, IVA, scadenzario e report; le note di credito (TD04/TD08) entrano con segno negativo.
+
 **Rimborsi.** `Gateway::refund()` (Stripe `/v1/refunds` sul `payment_intent`, PayPal `/captures/{id}/refund`); l'ordine passa a `refunded` solo se il gateway conferma.
 
 **Redirect.** `Redirects::add()` appiattisce le catene. Ogni cambio slug in `Catalog::save/saveCategory` e nelle pagine crea un 301; una pagina 404 per un URL sconosciuto consulta la tabella prima di rispondere.
@@ -59,7 +61,7 @@ PHP 8.1+ senza dipendenze, PDO con SQLite o MySQL. Il front controller è `publi
 
 ## Verifica eseguita
 
-`php tests/run.php` (46 test: formati monetari, prezzi variante, redirect, carrello, scorte, coupon, firme Stripe, flusso Stripe/PayPal con HTTP simulato, SEO, import/export con round trip, anti-SSRF, reset password, rimborsi, IVA per paese, log 404, immagine principale, Analytics, pagine legali, statistiche, recensioni, newsletter, carrelli abbandonati, fatture, avvisi disponibilità, Mollie, filtri, backup). Test manuali via browser: wizard, tutte le pagine admin, flusso carrello→checkout→ordine, cache/304/gzip, redirect, anteprima dei 10 temi.
+`php tests/run.php` (56 test: formati monetari, prezzi variante, redirect, carrello, scorte, coupon, firme Stripe, flusso Stripe/PayPal con HTTP simulato, SEO, import/export con round trip, anti-SSRF, reset password, rimborsi, IVA per paese, log 404, immagine principale, Analytics, pagine legali, statistiche, recensioni, newsletter, carrelli abbandonati, fatture, avvisi disponibilità, Mollie, filtri, backup, fatturazione elettronica con server PEC simulato, contabilità). Test manuali via browser: wizard, tutte le pagine admin, flusso carrello→checkout→ordine, cache/304/gzip, redirect, anteprima dei 10 temi.
 
 **Non verificato con servizi reali**: chiamate a Stripe, PayPal, SMTP e IndexNow (nessuna credenziale/rete nel test); sono coperte solo con risposte simulate e verifica delle firme.
 

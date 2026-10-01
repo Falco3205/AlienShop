@@ -16,6 +16,16 @@
       <div class="field"><label for="country"><?= e(__('Paese')) ?></label><select id="country" name="country" data-autosubmit-refresh><?php foreach ($countries as $code => $label): ?><option value="<?= $code ?>" <?= old('country', setting('default_country', 'IT')) === $code ? 'selected' : '' ?>><?= e($label) ?></option><?php endforeach ?></select></div></div>
       <div class="field"><label for="note"><?= e(__('Note per il corriere (opzionale)')) ?></label><textarea id="note" name="note" rows="2"><?= e(old('note')) ?></textarea></div>
     </fieldset>
+    <?php if (Alien\Services\Modules::on('einvoice')): ?>
+    <fieldset><legend><?= e(__('Fattura')) ?></legend>
+      <label style="display:flex;gap:10px;align-items:center;font-weight:500"><input type="checkbox" id="inv-toggle" name="invoice_request" value="1" style="width:auto" <?= old('invoice_request') ? 'checked' : '' ?>> <?= e(__('Desidero la fattura')) ?></label>
+      <div id="inv-box" style="margin-top:12px" <?= old('invoice_request') ? '' : 'hidden' ?>>
+        <div class="field"><label for="inv-type"><?= e(__('Tipo di cliente')) ?></label><select id="inv-type" name="invoice_type"><option value="private" <?= old('invoice_type') === 'private' ? 'selected' : '' ?>><?= e(__('Privato')) ?></option><option value="company" <?= old('invoice_type') === 'company' ? 'selected' : '' ?>><?= e(__('Azienda / professionista')) ?></option></select></div>
+        <div class="field"><label for="inv-name"><?= e(__('Ragione sociale (o nome e cognome)')) ?></label><input id="inv-name" name="invoice_name" value="<?= e(old('invoice_name')) ?>"></div>
+        <div class="row"><div class="field"><label for="inv-vat"><?= e(__('Partita IVA')) ?></label><input id="inv-vat" name="invoice_vat" inputmode="numeric" value="<?= e(old('invoice_vat')) ?>"></div><div class="field"><label for="inv-cf"><?= e(__('Codice fiscale')) ?></label><input id="inv-cf" name="invoice_cf" value="<?= e(old('invoice_cf')) ?>"></div></div>
+        <div class="row"><div class="field"><label for="inv-sdi"><?= e(__('Codice destinatario SdI')) ?></label><input id="inv-sdi" name="invoice_sdi" maxlength="7" value="<?= e(old('invoice_sdi')) ?>"></div><div class="field"><label for="inv-pec">PEC</label><input id="inv-pec" type="email" name="invoice_pec" value="<?= e(old('invoice_pec')) ?>"></div></div>
+      </div></fieldset>
+    <?php endif ?>
     <?php if ($totals['shipping_methods']): ?>
     <fieldset><legend><?= e(__('Spedizione')) ?></legend>
       <?php foreach ($totals['shipping_methods'] as $m): $price = Alien\Services\Shipping::price($m, $totals['subtotal'] - $totals['discount'], !empty($totals['coupon']['free_shipping'])); ?>

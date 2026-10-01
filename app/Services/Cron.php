@@ -38,6 +38,7 @@ final class Cron
             'expired' => self::expireUnpaid(),
             'mails' => self::sendQueue(),
             'reminders' => Modules::on('abandoned_cart') ? AbandonedCarts::sendReminders() : 0,
+            'einvoice' => EInvoices::cron(),
             'review_requests' => Modules::on('reviews') ? Reviews::sendRequests() : 0,
         ];
         Settings::set('cron_last', now());

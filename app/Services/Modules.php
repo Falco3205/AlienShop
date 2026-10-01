@@ -16,6 +16,7 @@ final class Modules
             'invoices' => ['icon' => '🧾', 'name' => __('Fatture e ricevute PDF'), 'text' => __('Documenti PDF numerati per ogni ordine, inviabili al cliente, con esportazione per il commercialista.'), 'default' => 1, 'link' => 'admin/invoices'],
             'wishlist' => ['icon' => '❤️', 'name' => __('Lista dei desideri'), 'text' => __('I visitatori salvano i prodotti preferiti e li ritrovano in una pagina dedicata.'), 'default' => 0, 'link' => null],
             'stock_alerts' => ['icon' => '🔔', 'name' => __('Avvisami quando torna disponibile'), 'text' => __('Sui prodotti esauriti il cliente lascia l\'email e riceve un avviso al rifornimento.'), 'default' => 1, 'link' => null],
+            'einvoice' => ['icon' => '🇮🇹', 'name' => __('Fatturazione elettronica e contabilità (Italia)'), 'text' => __('Fatture XML verso SdI via PEC, ricezione fatture dei fornitori, registri vendite e acquisti, IVA e scadenzario.'), 'default' => 0, 'link' => 'admin/einvoice'],
             'stats' => ['icon' => '📈', 'name' => __('Statistiche interne'), 'text' => __('Visite, carrelli e vendite per prodotto, senza cookie né dati personali.'), 'default' => 1, 'link' => 'admin/stats'],
         ];
     }

@@ -1,0 +1,9 @@
+<div class="grid2"><div class="card" style="padding:0"><table><thead><tr><th><?= e(__('Data')) ?></th><th><?= e(__('Descrizione')) ?></th><th><?= e(__('Categoria')) ?></th><th class="right"><?= e(__('Imponibile')) ?></th><th class="right">IVA</th><th></th></tr></thead><tbody>
+<?php foreach ($rows as $r): ?><tr><td><?= e($r['day']) ?></td><td><?= e($r['description']) ?><div class="muted"><?= e($r['supplier']) ?></div></td><td class="muted"><?= e($r['category']) ?></td><td class="right"><?= e(money($r['net'])) ?></td><td class="right"><?= e(money($r['vat'])) ?></td>
+<td class="right"><form method="post" action="<?= e(url('admin/expenses/' . $r['id'] . '/delete')) ?>"><?= csrf_field() ?><button class="btn danger sm">✕</button></form></td></tr><?php endforeach ?>
+<?php if (!$rows): ?><tr><td colspan="6"><?= a_empty('🧾', __('Nessuna spesa registrata'), __('Aggiungi i costi che non hanno una fattura elettronica: così il margine è corretto.')) ?></td></tr><?php endif ?></tbody></table></div>
+<div class="card"><h2><?= e(__('Nuova spesa')) ?></h2><form method="post" action="<?= e(url('admin/expenses')) ?>"><?= csrf_field() ?>
+<?= a_input('day', __('Data'), date('Y-m-d'), 'date') ?><?= a_input('description', __('Descrizione'), '', 'text', ['required' => true]) ?><?= a_input('supplier', __('Fornitore'), '') ?>
+<div class="field"><label for="f_category"><?= e(__('Categoria')) ?></label><input id="f_category" name="category" list="cats"><datalist id="cats"><?php foreach ($categories as $c): ?><option value="<?= e($c) ?>"><?php endforeach ?></datalist></div>
+<div class="row"><?= a_input('net', __('Imponibile'), '', 'text', ['required' => true, 'inputmode' => 'decimal']) ?><?= a_input('vat', 'IVA', '0', 'text', ['inputmode' => 'decimal']) ?></div>
+<?= a_input('deductible', __('IVA detraibile (%)'), 100, 'number', ['min' => 0, 'max' => 100]) ?><button class="btn" type="submit"><?= e(__('Aggiungi')) ?></button></form></div></div>

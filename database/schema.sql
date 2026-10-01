@@ -188,6 +188,7 @@ CREATE TABLE IF NOT EXISTS orders (
   shipping_address TEXT,
   note TEXT,
   tracking VARCHAR(190) NOT NULL DEFAULT '',
+  tax_rate INTEGER,
   invoice_number VARCHAR(30) NOT NULL DEFAULT '',
   invoice_date VARCHAR(19),
   review_asked INTEGER NOT NULL DEFAULT 0,
@@ -314,3 +315,73 @@ CREATE TABLE IF NOT EXISTS stock_alerts (
   created_at VARCHAR(19) NOT NULL
 ){ENGINE};
 CREATE UNIQUE INDEX idx_sa_unique ON stock_alerts (product_id, email);
+
+CREATE TABLE IF NOT EXISTS einvoices (
+  id {PK},
+  order_id INTEGER NOT NULL DEFAULT 0,
+  doc_type VARCHAR(6) NOT NULL DEFAULT 'TD01',
+  number VARCHAR(30) NOT NULL,
+  issue_date VARCHAR(10) NOT NULL,
+  progressivo VARCHAR(10) NOT NULL,
+  file_name VARCHAR(80) NOT NULL,
+  status VARCHAR(20) NOT NULL DEFAULT 'generated',
+  sdi_id VARCHAR(40) NOT NULL DEFAULT '',
+  customer_name VARCHAR(190) NOT NULL DEFAULT '',
+  customer_vat VARCHAR(30) NOT NULL DEFAULT '',
+  customer_cf VARCHAR(30) NOT NULL DEFAULT '',
+  recipient VARCHAR(190) NOT NULL DEFAULT '',
+  net INTEGER NOT NULL DEFAULT 0,
+  vat INTEGER NOT NULL DEFAULT 0,
+  total INTEGER NOT NULL DEFAULT 0,
+  currency VARCHAR(3) NOT NULL DEFAULT 'EUR',
+  related_id INTEGER NOT NULL DEFAULT 0,
+  errors TEXT,
+  log TEXT,
+  sent_at VARCHAR(19),
+  created_at VARCHAR(19) NOT NULL
+){ENGINE};
+CREATE UNIQUE INDEX idx_einv_number ON einvoices (number);
+CREATE UNIQUE INDEX idx_einv_file ON einvoices (file_name);
+CREATE INDEX idx_einv_order ON einvoices (order_id);
+CREATE INDEX idx_einv_date ON einvoices (issue_date);
+
+CREATE TABLE IF NOT EXISTS purchase_invoices (
+  id {PK},
+  supplier_name VARCHAR(190) NOT NULL,
+  supplier_vat VARCHAR(30) NOT NULL DEFAULT '',
+  supplier_cf VARCHAR(30) NOT NULL DEFAULT '',
+  country VARCHAR(2) NOT NULL DEFAULT 'IT',
+  doc_type VARCHAR(6) NOT NULL DEFAULT 'TD01',
+  number VARCHAR(40) NOT NULL,
+  issue_date VARCHAR(10) NOT NULL,
+  due_date VARCHAR(10),
+  currency VARCHAR(3) NOT NULL DEFAULT 'EUR',
+  net INTEGER NOT NULL DEFAULT 0,
+  vat INTEGER NOT NULL DEFAULT 0,
+  total INTEGER NOT NULL DEFAULT 0,
+  deductible INTEGER NOT NULL DEFAULT 100,
+  category VARCHAR(80) NOT NULL DEFAULT '',
+  paid_at VARCHAR(10),
+  source VARCHAR(10) NOT NULL DEFAULT 'upload',
+  xml_hash VARCHAR(40) NOT NULL,
+  data TEXT NOT NULL,
+  notes TEXT,
+  received_at VARCHAR(19) NOT NULL
+){ENGINE};
+CREATE UNIQUE INDEX idx_pi_unique ON purchase_invoices (supplier_vat, supplier_name, number, issue_date, doc_type);
+CREATE INDEX idx_pi_date ON purchase_invoices (issue_date);
+
+CREATE TABLE IF NOT EXISTS expenses (
+  id {PK},
+  day VARCHAR(10) NOT NULL,
+  supplier VARCHAR(190) NOT NULL DEFAULT '',
+  description VARCHAR(255) NOT NULL,
+  category VARCHAR(80) NOT NULL DEFAULT '',
+  net INTEGER NOT NULL DEFAULT 0,
+  vat INTEGER NOT NULL DEFAULT 0,
+  total INTEGER NOT NULL DEFAULT 0,
+  deductible INTEGER NOT NULL DEFAULT 100,
+  paid INTEGER NOT NULL DEFAULT 1,
+  created_at VARCHAR(19) NOT NULL
+){ENGINE};
+CREATE INDEX idx_exp_day ON expenses (day);

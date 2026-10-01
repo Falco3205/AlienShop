@@ -223,6 +223,9 @@
     if (ck.value) sendCapture();
   }
 
+  var it = $('#inv-toggle');
+  if (it) it.addEventListener('change', function () { $('#inv-box').hidden = !it.checked; });
+
   var nf = $('#newsletter-form');
   if (nf && window.fetch) {
     nf.addEventListener('submit', function (ev) {

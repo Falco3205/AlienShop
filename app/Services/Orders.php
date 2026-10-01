@@ -46,6 +46,7 @@ final class Orders
                 'discount' => $totals['discount'],
                 'shipping' => $totals['shipping'],
                 'tax' => $totals['tax'],
+                'tax_rate' => (int)round($totals['tax_rate'] * 100),
                 'total' => $totals['total'],
                 'coupon_code' => $totals['coupon']['code'] ?? '',
                 'shipping_method' => $totals['shipping_method']['name'] ?? '',
@@ -138,6 +139,7 @@ final class Orders
         ], 'id = ?', [$order['id']]);
         self::event((int)$order['id'], __('Pagamento ricevuto (%s).', $order['payment_method']));
         self::notify(self::find((int)$order['id']));
+        EInvoices::autoIssue(self::find((int)$order['id']));
         if (Modules::on('invoices') && (string)Settings::get('invoices_auto', '0') === '1') {
             Invoices::sendToCustomer(self::find((int)$order['id']));
         }
@@ -183,6 +185,13 @@ final class Orders
             self::event($id, __('Magazzino ripristinato.'));
         }
         self::event($id, __('Stato cambiato in: %s', __(self::STATUSES[$status])));
+        if ($status === 'refunded' && EInvoices::enabled() && (string)Settings::get('einv_auto_credit', '1') === '1') {
+            $orig = DB::row("SELECT id FROM einvoices WHERE order_id = ? AND doc_type = 'TD01' AND status <> 'error' ORDER BY id DESC", [$id]);
+            if ($orig) {
+                $res = EInvoices::creditNote((int)$orig['id']);
+                self::event($id, $res['ok'] ? __('Nota di credito %s emessa.', $res['invoice']['number']) : __('Nota di credito non emessa: %s', implode(' ', $res['errors'])));
+            }
+        }
         if ($status === 'shipped' && $o['email']) {
             Mailer::send($o['email'], __('Il tuo ordine %s è stato spedito', $o['number']), self::emailHtml(self::find($id), __('Il tuo ordine è in viaggio!')));
         }

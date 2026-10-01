@@ -27,6 +27,18 @@
     <?php if (Alien\Services\Modules::on('invoices')): ?><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px"><a class="btn sec sm" href="<?= e(url('admin/orders/' . $o['id'] . '/invoice')) ?>">🧾 <?= e($o['invoice_number'] !== '' ? __('Scarica') . ' ' . $o['invoice_number'] : __('Genera PDF')) ?></a>
       <form method="post" action="<?= e(url('admin/orders/' . $o['id'] . '/invoice/send')) ?>"><?= csrf_field() ?><button class="btn sec sm"><?= e(__('Invia al cliente')) ?></button></form></div><?php endif ?>
     <?php if ($o['payment_status'] === 'paid' && !in_array($o['status'], ['refunded'], true) && in_array($o['payment_method'], ['stripe', 'paypal', 'mollie'], true)): ?><form method="post" data-confirm="<?= e(__('Rimborsare l\'intero importo al cliente?')) ?>" style="margin-top:10px"><?= csrf_field() ?><input type="hidden" name="action" value="refund"><button class="btn danger sm" type="submit"><?= e(__('Rimborsa tramite gateway')) ?></button></form><?php endif ?>
+    <?php if (Alien\Services\Modules::on('einvoice')): $eis = Alien\Services\EInvoices::forOrder((int)$o['id']); $iv = (array)($o['billing']['invoice'] ?? []); ?>
+    <div style="margin-top:12px;border-top:1px solid var(--border);padding-top:12px"><strong>🇮🇹 <?= e(__('Fattura elettronica')) ?></strong>
+      <?php foreach ($eis as $ei): ?><div style="margin:6px 0"><a href="<?= e(url('admin/einvoice/' . $ei['id'])) ?>"><?= e($ei['number']) ?></a> <span class="pill <?= in_array($ei['status'], ['delivered', 'accepted', 'expired'], true) ? 'ok' : (in_array($ei['status'], ['rejected', 'error', 'refused'], true) ? 'bad' : 'warn') ?>"><?= e(Alien\Services\EInvoices::statusLabel($ei['status'])) ?></span></div><?php endforeach ?>
+      <?php if (!$eis || $eis[0]['status'] === 'error'): ?><details style="margin-top:8px"><summary class="btn sec sm" style="display:inline-flex;cursor:pointer"><?= e(__('Emetti fattura elettronica')) ?></summary>
+        <form method="post" action="<?= e(url('admin/orders/' . $o['id'] . '/einvoice')) ?>" style="margin-top:10px"><?= csrf_field() ?>
+          <?= a_select('type', __('Tipo di cliente'), ['private' => __('Privato'), 'company' => __('Azienda / professionista')], $iv['type'] ?? 'private') ?>
+          <?= a_input('name', __('Ragione sociale o nome'), $iv['name'] ?? ($s['name'] ?? '')) ?>
+          <div class="row"><?= a_input('vat', __('Partita IVA'), $iv['vat'] ?? '') ?><?= a_input('cf', __('Codice fiscale'), $iv['cf'] ?? '') ?></div>
+          <div class="row"><?= a_input('sdi', __('Codice destinatario'), $iv['sdi'] ?? '') ?><?= a_input('pec', 'PEC', $iv['pec'] ?? '') ?></div>
+          <?= a_input('state', __('Provincia (sigla)'), $o['billing']['state'] ?? '', 'text', ['maxlength' => 2]) ?>
+          <button class="btn sm" type="submit"><?= e(__('Emetti')) ?></button></form></details><?php endif ?></div>
+    <?php endif ?>
     <?php if ($o['payment_status'] !== 'paid'): ?><form method="post" style="margin-top:10px"><?= csrf_field() ?><input type="hidden" name="action" value="paid"><button class="btn sec sm" type="submit"><?= e(__('Segna come pagato')) ?></button></form><?php endif ?></div>
   <div class="card"><h2><?= e(__('Cliente')) ?></h2><p><a href="mailto:<?= e($o['email']) ?>"><?= e($o['email']) ?></a><br><?= e($s['phone'] ?? '') ?></p>
     <h2><?= e(__('Spedizione')) ?></h2><p><?= e($s['name'] ?? '') ?><br><?= e($s['address'] ?? '') ?><br><?= e(($s['zip'] ?? '') . ' ' . ($s['city'] ?? '') . ' ' . ($s['state'] ?? '')) ?><br><?= e($s['country'] ?? '') ?></p>

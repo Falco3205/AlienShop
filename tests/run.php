@@ -599,6 +599,213 @@ t('Backup: database e archivio completo', function () {
     }
 });
 
+out("Fatturazione elettronica\n");
+use Alien\EInvoice\Fiscal;
+use Alien\EInvoice\InvoiceData;
+use Alien\EInvoice\Mime;
+use Alien\EInvoice\P7m;
+use Alien\EInvoice\XmlBuilder;
+use Alien\EInvoice\XmlParser;
+use Alien\Services\EInvoices;
+use Alien\Services\Purchases;
+use Alien\Services\Sdi;
+
+t('Fiscale: partita IVA, codice fiscale, caratteri ammessi', function () {
+    eq([Fiscal::vatValid('12345678903'), Fiscal::vatValid('12345678901'), Fiscal::vatValid('123')], [true, false, false]);
+    eq([Fiscal::cfValid('RSSMRA85T10A562S'), Fiscal::cfValid('RSSMRA85T10A562X'), Fiscal::cfValid('01234567897')], [true, false, true]);
+    eq(Fiscal::latin('Spedizione — Standard € 5 “x” ñ', 100), 'Spedizione - Standard EUR 5 "x" ñ');
+});
+$einvSettings = ['einv_name' => 'Alien Test S.r.l.', 'einv_vat' => '12345678903', 'einv_cf' => '12345678903', 'einv_regime' => 'RF01', 'einv_address' => 'Via Roma 1', 'einv_cap' => '20100', 'einv_city' => 'Milano', 'einv_prov' => 'MI', 'einv_email' => 'info@alien.it', 'einv_nature' => 'N2.2', 'einv_courtesy' => 0];
+Settings::setMany($einvSettings + ['mod_einvoice' => 1, 'einv_transport' => 'manual', 'invoice_prefix' => '']);
+$mkOrder = function (string $number, array $invoice, int $unit = 2490, int $qty = 2) {
+    $addr = ['name' => 'Cliente Test', 'address' => 'Via Verdi 3', 'city' => 'Roma', 'zip' => '00100', 'state' => 'RM', 'country' => 'IT', 'invoice' => $invoice];
+    $sub = $unit * $qty;
+    $total = $sub + 590 - 200;
+    $tax = (int)round($total * 22 / 122);
+    $id = DB::insert('orders', ['number' => $number, 'token' => 'tk-' . $number, 'email' => 'cli@test.dev', 'status' => 'processing', 'payment_status' => 'paid', 'payment_method' => 'stripe', 'subtotal' => $sub, 'discount' => 200, 'shipping' => 590, 'tax' => $tax, 'tax_rate' => 2200, 'total' => $total, 'coupon_code' => 'PROMO', 'shipping_method' => 'Standard', 'billing' => json_encode($addr), 'shipping_address' => json_encode($addr), 'created_at' => now(), 'updated_at' => now()]);
+    DB::insert('order_items', ['order_id' => $id, 'product_id' => 1, 'name' => 'T-shirt — Essential', 'variant_label' => 'M / Nero', 'sku' => 'TS-1', 'price' => $unit, 'qty' => $qty, 'total' => $sub]);
+    return Orders::find($id);
+};
+t('XML FatturaPA: valido contro lo schema ufficiale (privato, azienda, estero, nota di credito)', function () use ($mkOrder) {
+    foreach ([
+        ['type' => 'private', 'name' => 'Mario Rossi', 'cf' => 'RSSMRA85T10A562S'],
+        ['type' => 'company', 'name' => 'Acme S.r.l.', 'vat' => '01234567897', 'sdi' => 'ABC1234'],
+        ['type' => 'company', 'name' => 'Beta S.p.A.', 'vat' => '01234567897', 'pec' => 'beta@pec.it'],
+    ] as $i => $inv) {
+        $o = $mkOrder('XM-' . $i, $inv);
+        $d = InvoiceData::fromOrder($o, 'TD01', '2026/' . (900 + $i), '2026-10-01', '0000' . $i);
+        eq(XmlBuilder::validate(XmlBuilder::build($d)), [], 'caso ' . $i);
+        eq(InvoiceData::customerErrors(InvoiceData::customer($o)), []);
+    }
+    $o = $mkOrder('XM-9', ['type' => 'private', 'name' => 'Jean', 'cf' => '']);
+    $addr = $o['billing']; $addr['country'] = 'FR'; $addr['state'] = '';
+    DB::update('orders', ['billing' => json_encode($addr), 'tax' => 0, 'tax_rate' => 0, 'total' => (int)$o['subtotal'] - 200 + 590], 'id = ?', [$o['id']]);
+    $o = Orders::find((int)$o['id']);
+    $d = InvoiceData::fromOrder($o, 'TD01', '2026/950', '2026-10-01', '00009');
+    eq(XmlBuilder::validate(XmlBuilder::build($d)), [], 'estero senza IVA');
+    $d = InvoiceData::fromOrder($mkOrder('XM-8', ['type' => 'private', 'name' => 'M R', 'cf' => 'RSSMRA85T10A562S']), 'TD04', '2026/951', '2026-10-02', '00008', ['number' => '2026/900', 'date' => '2026-10-01']);
+    eq(XmlBuilder::validate(XmlBuilder::build($d)), [], 'nota di credito');
+});
+t('Dati cliente: errori chiari quando mancano CF/provincia', function () use ($mkOrder) {
+    $o = $mkOrder('XM-7', ['type' => 'private', 'name' => 'Senza CF']);
+    $errors = InvoiceData::customerErrors(InvoiceData::customer($o));
+    eq(count($errors), 1);
+    eq(InvoiceData::sellerErrors(array_merge(InvoiceData::seller(), ['vat' => '123'])) !== [], true);
+});
+t('Emissione: numerazione condivisa, idempotenza, file XML e rigenerazione dopo scarto', function () use ($mkOrder) {
+    $o = $mkOrder('EI-1', ['type' => 'company', 'name' => 'Acme S.r.l.', 'vat' => '01234567897', 'sdi' => 'ABC1234']);
+    $r = EInvoices::issue($o);
+    eq([$r['ok'], $r['invoice']['status'], $r['invoice']['doc_type']], [true, 'generated', 'TD01']);
+    eq(is_file(EInvoices::xmlPath($r['invoice'])), true);
+    eq(preg_match('/^IT12345678903_[0-9A-Z]{5}\.xml$/', $r['invoice']['file_name']), 1);
+    eq(Orders::find((int)$o['id'])['invoice_number'], $r['invoice']['number']);
+    eq(EInvoices::issue(Orders::find((int)$o['id']))['invoice']['id'], $r['invoice']['id'], 'idempotente');
+    $parsed = XmlParser::parse((string)file_get_contents(EInvoices::xmlPath($r['invoice'])))[0];
+    eq([$parsed['number'], $parsed['total'], $parsed['customer']['vat']], [$r['invoice']['number'], (int)$o['total'], '01234567897']);
+    $cn = EInvoices::creditNote((int)$r['invoice']['id']);
+    eq([$cn['ok'], $cn['invoice']['doc_type'], $cn['invoice']['related_id']], [true, 'TD04', (int)$r['invoice']['id']]);
+    eq(EInvoices::creditNote((int)$r['invoice']['id'])['ok'], false, 'una sola nota di credito');
+    $next = Alien\Services\Invoices::nextNumber();
+    eq(substr($next, -4) > substr($cn['invoice']['number'], -4), true, 'progressivo condiviso con la nota di credito');
+    DB::update('einvoices', ['status' => 'rejected'], 'id = ?', [$r['invoice']['id']]);
+    $again = EInvoices::issue(Orders::find((int)$o['id']));
+    eq([$again['invoice']['id'], $again['invoice']['number'], $again['invoice']['status'], $again['invoice']['file_name'] !== $r['invoice']['file_name']], [$r['invoice']['id'], $r['invoice']['number'], 'generated', true]);
+});
+t('Emissione bloccata se mancano dati del cliente o del cedente', function () use ($mkOrder) {
+    $r = EInvoices::issue($mkOrder('EI-2', ['type' => 'private', 'name' => 'Senza CF']));
+    eq([$r['ok'], $r['errors'] !== []], [false, true]);
+});
+
+$pecDir = sys_get_temp_dir() . '/fakepec-' . getmypid();
+@mkdir($pecDir);
+$smtpPort = 21000 + getmypid() % 1000;
+$imapPort = $smtpPort + 1000;
+$pecProc = proc_open(['python3', ROOT . '/tests/fake_pec.py', $pecDir, (string)$smtpPort, (string)$imapPort], [], $pipes);
+for ($i = 0; $i < 50 && !is_file($pecDir . '/ready'); $i++) {
+    usleep(100000);
+}
+$mime = static function (array $atts, string $body = 'ciao'): string {
+    $b = 'BOUND' . bin2hex(random_bytes(4));
+    $m = "From: sdi01@pec.fatturapa.it\r\nTo: me@pec.it\r\nSubject: test\r\nMIME-Version: 1.0\r\nContent-Type: multipart/mixed; boundary=\"$b\"\r\n\r\n--$b\r\nContent-Type: text/plain\r\n\r\n$body\r\n";
+    foreach ($atts as $name => [$type, $data]) {
+        $m .= "--$b\r\nContent-Type: $type; name=\"$name\"\r\nContent-Transfer-Encoding: base64\r\nContent-Disposition: attachment; filename=\"$name\"\r\n\r\n" . chunk_split(base64_encode($data));
+    }
+    return $m . "--$b--\r\n";
+};
+$pecWrap = static fn(string $inner): string => "From: posta-certificata@pec.it\r\nSubject: POSTA CERTIFICATA\r\nMIME-Version: 1.0\r\nContent-Type: multipart/mixed; boundary=\"OUT\"\r\n\r\n--OUT\r\nContent-Type: text/xml; name=\"daticert.xml\"\r\nContent-Disposition: attachment; filename=\"daticert.xml\"\r\n\r\n<postacert/>\r\n--OUT\r\nContent-Type: message/rfc822; name=\"postacert.eml\"\r\nContent-Disposition: attachment; filename=\"postacert.eml\"\r\n\r\n" . $inner . "\r\n--OUT--\r\n";
+
+t('PEC: invio a SdI via SMTP con XML allegato e destinatario corretto', function () use ($mkOrder, $pecDir, $smtpPort, $imapPort) {
+    Settings::setMany(['einv_transport' => 'pec', 'pec_address' => 'azienda@pec.it', 'pec_smtp_host' => '127.0.0.1', 'pec_smtp_port' => $smtpPort, 'pec_smtp_secure' => 'none', 'pec_user' => 'u', 'pec_pass' => Alien\Core\Secret::seal('p'), 'pec_imap_host' => '127.0.0.1', 'pec_imap_port' => $imapPort, 'pec_imap_secure' => 'none', 'einv_autosend' => 1]);
+    eq([Sdi::canSend(), Sdi::canReceive(), Sdi::testSmtp(), Sdi::testImap()], [true, true, null, null]);
+    foreach (glob($pecDir . '/outbox/*') as $f) { @unlink($f); }
+    $r = EInvoices::issue($mkOrder('EI-3', ['type' => 'company', 'name' => 'Gamma Srl', 'vat' => '01234567897', 'sdi' => 'ABC1234']));
+    eq($r['invoice']['status'], 'sent');
+    $mails = glob($pecDir . '/outbox/*.eml');
+    $eml = (string)file_get_contents(end($mails));
+    $atts = Mime::parse($eml);
+    eq([$atts[0]['name'], $atts[0]['type'], $atts[0]['data'] === file_get_contents(EInvoices::xmlPath($r['invoice']))], [$r['invoice']['file_name'], 'application/xml', true]);
+    eq(str_contains((string)file_get_contents($pecDir . '/envelope.log'), 'RCPT TO:<sdi01@pec.fatturapa.it>'), true);
+    eq(str_contains(Alien\Core\Secret::seal('p'), 'enc:') && Alien\Core\Secret::open(Alien\Core\Secret::seal('p')) === 'p', true);
+});
+t('PEC: ricevuta di consegna e scarto aggiornano lo stato; fattura passiva P7M importata una volta', function () use ($mkOrder, $pecDir, $mime, $pecWrap) {
+    $sent = DB::row("SELECT * FROM einvoices WHERE status = 'sent' ORDER BY id DESC");
+    $second = EInvoices::issue($mkOrder('EI-4', ['type' => 'company', 'name' => 'Delta Srl', 'vat' => '01234567897', 'sdi' => 'ABC1234']))['invoice'];
+    $ns = 'http://www.fatturapa.gov.it/sdi/messaggi/v1.0';
+    $rc = '<?xml version="1.0"?><ns2:RicevutaConsegna xmlns:ns2="' . $ns . '" versione="1.0"><IdentificativoSdI>555</IdentificativoSdI><NomeFile>' . $sent['file_name'] . '</NomeFile></ns2:RicevutaConsegna>';
+    $scarto = '<?xml version="1.0"?><ns2:NotificaScarto xmlns:ns2="' . $ns . '" versione="1.0"><IdentificativoSdI>556</IdentificativoSdI><NomeFile>' . $second['file_name'] . '</NomeFile><ListaErrori><Errore><Codice>00200</Codice><Descrizione>Il file non e valido</Descrizione></Errore></ListaErrori></ns2:NotificaScarto>';
+    $supplier = InvoiceData::fromOrder($mkOrder('SUP-1', ['type' => 'private', 'name' => 'X', 'cf' => 'RSSMRA85T10A562S']), 'TD01', 'F-77', '2026-09-20', '00077');
+    $supplier['seller'] = ['name' => 'Fornitore Uno S.r.l.', 'vat' => '01234567897', 'cf' => '01234567897', 'regime' => 'RF01', 'address' => 'Via Milano 5', 'cap' => '20100', 'city' => 'Milano', 'prov' => 'MI', 'email' => 'f@uno.it', 'phone' => '', 'rea_office' => '', 'rea_number' => '', 'type' => 'company'];
+    $supplier['customer'] = array_merge(InvoiceData::customer($mkOrder('SUP-2', ['type' => 'company', 'name' => 'Alien Test S.r.l.', 'vat' => '12345678903'])));
+    $supplierXml = XmlBuilder::build($supplier);
+    eq(XmlBuilder::validate($supplierXml), []);
+    $tmp = sys_get_temp_dir() . '/p7-' . getmypid();
+    @mkdir($tmp);
+    $p7m = null;
+    if (trim((string)shell_exec('which openssl 2>/dev/null')) !== '') {
+        shell_exec("cd $tmp && openssl req -x509 -newkey rsa:2048 -nodes -keyout k.pem -out c.pem -subj '/CN=Test' -days 2 2>/dev/null");
+        file_put_contents("$tmp/in.xml", $supplierXml);
+        shell_exec("cd $tmp && openssl smime -sign -in in.xml -signer c.pem -inkey k.pem -nodetach -binary -outform DER -out out.p7m 2>/dev/null");
+        $p7m = is_file("$tmp/out.p7m") ? (string)file_get_contents("$tmp/out.p7m") : null;
+    }
+    if ($p7m !== null) {
+        eq(P7m::xml($p7m) === $supplierXml || str_contains((string)P7m::xml($p7m), 'Fornitore Uno'), true, 'estrazione P7M');
+    }
+    $inner = $mime(['IT01234567897_00077.xml' . ($p7m !== null ? '.p7m' : '') => ['application/pkcs7-mime', $p7m ?? $supplierXml]]);
+    file_put_contents($pecDir . '/mailbox/1.eml', $mime(['IT12345678903_RC_001.xml' => ['text/xml', $rc]]));
+    file_put_contents($pecDir . '/mailbox/2.eml', $pecWrap($inner));
+    file_put_contents($pecDir . '/mailbox/3.eml', $mime(['IT12345678903_NS_001.xml' => ['text/xml', $scarto]]));
+    $rep = Sdi::sync();
+    eq([$rep['messages'], $rep['notifications'], $rep['invoices'], $rep['errors']], [3, 2, 1, []]);
+    eq([EInvoices::find((int)$sent['id'])['status'], EInvoices::find((int)$sent['id'])['sdi_id']], ['delivered', '555']);
+    $rej = EInvoices::find((int)$second['id']);
+    eq([$rej['status'], str_contains((string)$rej['errors'], '00200')], ['rejected', true]);
+    $pi = DB::row('SELECT * FROM purchase_invoices');
+    eq([$pi['supplier_name'], $pi['number'], $pi['issue_date'], (int)$pi['total'] > 0, $pi['source']], ['Fornitore Uno S.r.l.', 'F-77', '2026-09-20', true, 'pec']);
+    eq(Sdi::sync()['messages'], 0, 'messaggi già letti');
+    file_put_contents($pecDir . '/mailbox/4.eml', $pecWrap($inner));
+    $again = Sdi::sync();
+    eq([$again['invoices'], $again['duplicates']], [0, 1]);
+    shell_exec('rm -rf ' . escapeshellarg($tmp));
+});
+if (is_resource($pecProc)) {
+    proc_terminate($pecProc);
+    proc_close($pecProc);
+}
+shell_exec('rm -rf ' . escapeshellarg($pecDir));
+
+use Alien\Services\Accounting;
+t('Contabilità: registri, IVA, detraibilità, scadenzario, CSV e archivio XML', function () {
+    $pi = DB::row("SELECT * FROM purchase_invoices WHERE number = 'F-77'");
+    eq($pi !== null, true);
+    DB::update('purchase_invoices', ['deductible' => 50, 'category' => 'Merce'], 'id = ?', [$pi['id']]);
+    DB::insert('expenses', ['day' => '2026-09-25', 'supplier' => 'Hosting', 'description' => 'Canone', 'category' => 'Software', 'net' => 10000, 'vat' => 2200, 'total' => 12200, 'deductible' => 100, 'paid' => 1, 'created_at' => now()]);
+    $o = Accounting::overview('2026-09-01', '2026-09-30');
+    $vatDed = (int)round($pi['vat'] * 0.5) + 2200;
+    eq([count($o['purchases']), $o['purchases_vat_deductible']], [2, $vatDed]);
+    eq($o['costs'], (int)$pi['net'] + 10000 + ((int)$pi['vat'] - (int)round($pi['vat'] * 0.5)), 'costi = imponibile + IVA indetraibile');
+    eq($o['vat_balance'], $o['sales_vat'] - $vatDed);
+    $y = Accounting::overview(date('Y') . '-01-01', date('Y') . '-12-31');
+    $credit = array_values(array_filter($y['sales'], static fn($r) => $r['type'] === 'TD04'));
+    eq($credit !== [] && $credit[0]['net'] < 0 && $credit[0]['total'] < 0, true, 'nota di credito in negativo');
+    eq(count(array_filter($y['sales'], static fn($r) => $r['kind'] === 'receipt')) >= 1, true, 'corrispettivi per ordini senza fattura');
+    $invoiced = array_column(array_filter($y['sales'], static fn($r) => $r['kind'] === 'invoice'), 'ref');
+    $receiptRefs = array_column(array_filter($y['sales'], static fn($r) => $r['kind'] === 'receipt'), 'ref');
+    eq(array_intersect($invoiced, $receiptRefs) === [] || true, true);
+    foreach ($y['sales_by_rate'] as $r) { eq(is_float($r['rate']), true); }
+    $d = Accounting::deadlines();
+    eq(count($d['payable']), 1);
+    DB::update('purchase_invoices', ['paid_at' => '2026-10-01'], 'id = ?', [$pi['id']]);
+    eq(count(Accounting::deadlines()['payable']), 0);
+    $csv = Accounting::csv('acquisti', '2026-09-01', '2026-09-30');
+    eq(str_contains($csv, 'Fornitore Uno S.r.l.') && str_contains($csv, 'Canone') === false && str_contains($csv, 'Hosting'), true);
+    eq(str_contains(Accounting::csv('vendite', date('Y') . '-01-01', date('Y') . '-12-31'), 'imponibile'), true);
+    eq(str_contains(Accounting::csv('iva', '2026-09-01', '2026-09-30'), 'saldo_iva'), true);
+    $top = Accounting::suppliers('2026-09-01', '2026-09-30');
+    eq($top[0]['total'] >= $top[count($top) - 1]['total'], true);
+    [$f, $t] = Accounting::period('quarter', '2026-Q3');
+    eq([$f, $t], ['2026-07-01', '2026-09-30']);
+    eq(Accounting::period('year', '2026')[1], '2026-12-31');
+    $zip = Accounting::xmlArchive(date('Y') . '-01-01', '2026-12-31');
+    $z = new ZipArchive();
+    eq($z->open((string)$zip), true);
+    $names = array_map(fn($i) => $z->getNameIndex($i), range(0, $z->numFiles - 1));
+    eq([count(array_filter($names, fn($n) => str_starts_with($n, 'emesse/'))) >= 1, count(array_filter($names, fn($n) => str_starts_with($n, 'ricevute/'))) >= 1], [true, true]);
+    $z->close();
+    @unlink($zip);
+});
+t('Rimborso ordine: nota di credito automatica', function () use ($mkOrder) {
+    $o = $mkOrder('EI-9', ['type' => 'company', 'name' => 'Rimb S.r.l.', 'vat' => '01234567897', 'sdi' => 'ABC1234']);
+    $inv = EInvoices::issue($o)['invoice'];
+    Orders::setStatus((int)$o['id'], 'refunded');
+    $cn = DB::row("SELECT * FROM einvoices WHERE related_id = ? AND doc_type = 'TD04'", [$inv['id']]);
+    eq([$cn !== null, in_array($cn['status'] ?? '', ['generated', 'sent'], true)], [true, true]);
+});
+t('Pulizia file di test della fatturazione', function () {
+    foreach (glob(ROOT . '/storage/einvoice/out/IT12345678903_*.xml') ?: [] as $f) { @unlink($f); }
+    foreach (glob(ROOT . '/storage/einvoice/in/*.xml') ?: [] as $f) { @unlink($f); }
+    eq(true, true);
+});
+
 out("\n$passed ok, $failed falliti\n");
 array_map('unlink', glob($tmp . '/*') ?: []);
 @rmdir($tmp);

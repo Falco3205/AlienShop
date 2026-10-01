@@ -23,6 +23,7 @@ final class SettingsController extends AdminController
             ['admin/shipping', '🚚', __('Spedizioni'), __('Metodi, prezzi e spedizione gratuita.')],
             ['admin/settings/mail', '✉️', __('Email'), __('Mittente e server SMTP per le notifiche.')],
             ['admin/settings/seo', '🔍', __('SEO e Google'), __('Titoli, sitemap, Search Console, Bing.')],
+            ['admin/einvoice' . (\Alien\Services\Modules::on('einvoice') ? '' : '/setup'), '🇮🇹', __('Fatturazione elettronica'), __('Fatture SdI via PEC, fatture dei fornitori e contabilità (Italia).')],
             ['admin/legal', '⚖️', __('Pagine legali'), __('Privacy, cookie, termini, resi: procedura guidata gratuita.')],
             ['admin/analytics', '📊', __('Google Analytics'), __('Collega le statistiche con una procedura guidata.')],
             ['admin/redirects', '↪️', __('Redirect e 404'), __('Mantieni il posizionamento quando cambiano gli URL.')],

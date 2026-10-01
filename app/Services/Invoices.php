@@ -19,18 +19,27 @@ final class Invoices
         };
     }
 
+    public static function nextNumber(): string
+    {
+        $year = date('Y');
+        $prefix = (string)Settings::get('invoice_prefix', '');
+        $max = 0;
+        $numbers = DB::col('SELECT invoice_number FROM orders WHERE invoice_number LIKE ?', [$prefix . $year . '/%']);
+        foreach (DB::col('SELECT number FROM einvoices WHERE number LIKE ?', [$prefix . $year . '/%']) as $n) {
+            $numbers[] = $n;
+        }
+        foreach ($numbers as $num) {
+            $max = max($max, (int)substr((string)$num, strrpos((string)$num, '/') + 1));
+        }
+        return $prefix . $year . '/' . str_pad((string)($max + 1), 4, '0', STR_PAD_LEFT);
+    }
+
     public static function assign(array $order): array
     {
         if ($order['invoice_number'] !== '') {
             return $order;
         }
-        $year = date('Y');
-        $prefix = (string)Settings::get('invoice_prefix', '');
-        $max = 0;
-        foreach (DB::col("SELECT invoice_number FROM orders WHERE invoice_number LIKE ?", [$prefix . $year . '/%']) as $num) {
-            $max = max($max, (int)substr((string)$num, strrpos((string)$num, '/') + 1));
-        }
-        $number = $prefix . $year . '/' . str_pad((string)($max + 1), 4, '0', STR_PAD_LEFT);
+        $number = self::nextNumber();
         DB::update('orders', ['invoice_number' => $number, 'invoice_date' => now()], 'id = ?', [$order['id']]);
         return Orders::find((int)$order['id']);
     }
@@ -49,7 +58,7 @@ final class Invoices
         return ['name' => $name, 'lines' => $lines];
     }
 
-    public static function pdf(array $order): string
+    public static function pdf(array $order, bool $courtesy = false): string
     {
         $order = self::assign($order);
         $cur = $order['currency'];
@@ -65,7 +74,10 @@ final class Invoices
             $pdf->text($m, $y, $l, 9, false, 'L', [0.35, 0.35, 0.4]);
             $y += 12;
         }
-        $pdf->text($right, 56, mb_strtoupper(self::title()), 16, true, 'R');
+        $pdf->text($right, 56, mb_strtoupper($courtesy ? __('Fattura') : self::title()), 16, true, 'R');
+        if ($courtesy) {
+            $pdf->text($right, 112, __('Copia di cortesia'), 8, true, 'R', [0.45, 0.45, 0.5]);
+        }
         $pdf->text($right, 74, 'N. ' . $order['invoice_number'], 10, true, 'R');
         $pdf->text($right, 88, __('Data') . ': ' . date('d/m/Y', strtotime((string)$order['invoice_date'])), 9, false, 'R', [0.35, 0.35, 0.4]);
         $pdf->text($right, 100, __('Ordine') . ' ' . $order['number'], 9, false, 'R', [0.35, 0.35, 0.4]);
@@ -125,8 +137,8 @@ final class Invoices
 
         $y += 14;
         $pdf->text($m, $y, __('Pagamento') . ': ' . $order['payment_method'] . ' — ' . __(Orders::PAYMENT_STATUSES[$order['payment_status']] ?? $order['payment_status']), 9, false, 'L', [0.35, 0.35, 0.4]);
-        $note = (string)Settings::get('invoice_note', '');
-        if ($note === '' && Settings::get('invoice_type', 'receipt') !== 'invoice') {
+        $note = $courtesy ? __('Copia di cortesia: l\'originale è la fattura elettronica trasmessa tramite il Sistema di Interscambio.') : (string)Settings::get('invoice_note', '');
+        if ($note === '' && !$courtesy && Settings::get('invoice_type', 'receipt') !== 'invoice') {
             $note = __('Documento commerciale non valido ai fini fiscali.');
         }
         if ($note !== '') {

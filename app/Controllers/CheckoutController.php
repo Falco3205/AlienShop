@@ -110,6 +110,18 @@ final class CheckoutController extends Controller
         if ($short = Cart::stockIsAvailable($lines)) {
             $errors[] = __('Prodotto non più disponibile nella quantità richiesta: %s', $short);
         }
+        $invoice = [];
+        if ($req->str('invoice_request') === '1' && \Alien\Services\Modules::on('einvoice')) {
+            $invoice = [
+                'requested' => 1, 'type' => $req->str('invoice_type') === 'company' ? 'company' : 'private',
+                'name' => $in('invoice_name') ?: $in('name'), 'vat' => preg_replace('/\s+/', '', $in('invoice_vat')) ?? '',
+                'cf' => strtoupper(preg_replace('/\s+/', '', $in('invoice_cf')) ?? ''), 'sdi' => strtoupper($in('invoice_sdi')), 'pec' => $in('invoice_pec'),
+            ];
+            $probe = \Alien\EInvoice\InvoiceData::customer(['billing' => ['name' => $in('name'), 'address' => $in('address'), 'zip' => $in('zip'), 'city' => $in('city'), 'state' => $in('state'), 'country' => $country, 'invoice' => $invoice], 'shipping_address' => []]);
+            foreach (\Alien\EInvoice\InvoiceData::customerErrors($probe) as $err) {
+                $errors[] = $err;
+            }
+        }
         $password = (string)($req->post['password'] ?? '');
         if ($password !== '' && strlen($password) < 8) {
             $errors[] = __('La password deve avere almeno 8 caratteri.');
@@ -126,6 +138,7 @@ final class CheckoutController extends Controller
         }
 
         $address = [
+            'invoice' => $invoice,
             'name' => $in('name'), 'phone' => $in('phone'), 'address' => $in('address'),
             'city' => $in('city'), 'zip' => $in('zip'), 'state' => $in('state'), 'country' => $country,
         ];

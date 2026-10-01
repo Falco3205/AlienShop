@@ -9,6 +9,26 @@ final class Mailer
     {
         $from = (string)Settings::get('mail_from', Settings::get('store_email', 'noreply@localhost'));
         $fromName = (string)Settings::get('store_name', 'AlienShop');
+        [$text, $headers, $body] = self::compose($from, $fromName, $html, $attachments);
+
+        $driver = (string)Settings::get('mail_driver', 'mail');
+        try {
+            if ($driver === 'smtp' && Settings::get('smtp_host')) {
+                return self::smtp($from, $to, self::encode($subject), $headers, $body);
+            }
+            if ($driver === 'log') {
+                self::log($to, $subject, $text);
+                return true;
+            }
+            return @mail($to, self::encode($subject), $body, implode("\r\n", $headers));
+        } catch (\Throwable $e) {
+            self::log($to, '[ERRORE] ' . $subject, $e->getMessage());
+            return false;
+        }
+    }
+
+    private static function compose(string $from, string $fromName, string $html, array $attachments): array
+    {
         $text = trim(html_entity_decode(strip_tags(preg_replace('#<br\s*/?>|</p>|</tr>#i', "\n", $html) ?? $html)));
         $boundary = 'b' . Str::randomToken(8);
         $alt = "--$boundary\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n"
@@ -34,21 +54,13 @@ final class Mailer
             'MIME-Version: 1.0',
             'Content-Type: ' . $contentType,
         ];
+        return [$text, $headers, $body];
+    }
 
-        $driver = (string)Settings::get('mail_driver', 'mail');
-        try {
-            if ($driver === 'smtp' && Settings::get('smtp_host')) {
-                return self::smtp($from, $to, self::encode($subject), $headers, $body);
-            }
-            if ($driver === 'log') {
-                self::log($to, $subject, $text);
-                return true;
-            }
-            return @mail($to, self::encode($subject), $body, implode("\r\n", $headers));
-        } catch (\Throwable $e) {
-            self::log($to, '[ERRORE] ' . $subject, $e->getMessage());
-            return false;
-        }
+    public static function sendSmtp(array $cfg, string $from, string $fromName, string $to, string $subject, string $html, array $attachments = []): void
+    {
+        [, $headers, $body] = self::compose($from, $fromName, $html, $attachments);
+        self::smtp($from, $to, self::encode($subject), $headers, $body, $cfg);
     }
 
     private static function encode(string $s): string
@@ -61,11 +73,12 @@ final class Mailer
         @file_put_contents(ROOT . '/storage/logs/mail.log', '[' . now() . "] To: $to | $subject\n$text\n\n", FILE_APPEND);
     }
 
-    private static function smtp(string $from, string $to, string $subject, array $headers, string $body): bool
+    private static function smtp(string $from, string $to, string $subject, array $headers, string $body, ?array $cfg = null): bool
     {
-        $host = (string)Settings::get('smtp_host');
-        $port = (int)Settings::get('smtp_port', 587);
-        $secure = (string)Settings::get('smtp_secure', 'tls');
+        $cfg ??= ['host' => (string)Settings::get('smtp_host'), 'port' => (int)Settings::get('smtp_port', 587), 'secure' => (string)Settings::get('smtp_secure', 'tls'), 'user' => (string)Settings::get('smtp_user'), 'pass' => (string)Settings::get('smtp_pass')];
+        $host = (string)$cfg['host'];
+        $port = (int)$cfg['port'];
+        $secure = (string)$cfg['secure'];
         $remote = ($secure === 'ssl' ? 'ssl://' : '') . $host . ':' . $port;
         $fp = @stream_socket_client($remote, $errno, $errstr, 12);
         if (!$fp) {
@@ -97,10 +110,10 @@ final class Mailer
             stream_socket_enable_crypto($fp, true, STREAM_CRYPTO_METHOD_TLS_CLIENT);
             $cmd('EHLO localhost', '250');
         }
-        if (Settings::get('smtp_user')) {
+        if (($cfg['user'] ?? '') !== '') {
             $cmd('AUTH LOGIN', '334');
-            $cmd(base64_encode((string)Settings::get('smtp_user')), '334');
-            $cmd(base64_encode((string)Settings::get('smtp_pass')), '235');
+            $cmd(base64_encode((string)$cfg['user']), '334');
+            $cmd(base64_encode((string)$cfg['pass']), '235');
         }
         $cmd('MAIL FROM:<' . $from . '>', '250');
         $cmd('RCPT TO:<' . $to . '>', '250');

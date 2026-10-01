@@ -27,6 +27,7 @@ $hour = (int)date('G');
   <a href="<?= e(url('admin/orders?status=pending')) ?>"><strong><?= (int)$todo['awaiting'] ?></strong><span><?= e(__('In attesa di pagamento')) ?></span></a>
   <a href="<?= e(url('admin/products?stock=low')) ?>" class="<?= $todo['low'] ? 'hot' : '' ?>"><strong><?= (int)$todo['low'] ?></strong><span><?= e(__('Prodotti in esaurimento')) ?></span></a>
   <a href="<?= e(url('admin/products?stock=out')) ?>"><strong><?= (int)$todo['out'] ?></strong><span><?= e(__('Prodotti esauriti')) ?></span></a>
+  <?php if ($todo['bills'] >= 0): ?><a href="<?= e(url('admin/purchases?paid=0')) ?>" class="<?= $todo['bills'] ? 'hot' : '' ?>"><strong><?= (int)$todo['bills'] ?></strong><span><?= e(__('Fatture fornitori da pagare')) ?></span></a><?php endif ?>
   <a href="<?= e(url('admin/products?status=draft')) ?>"><strong><?= (int)$todo['drafts'] ?></strong><span><?= e(__('Prodotti in bozza')) ?></span></a>
 </div>
 
