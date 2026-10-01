@@ -14,7 +14,7 @@ final class Auth
             return self::$user;
         }
         self::$loaded = true;
-        if (!isset($_COOKIE[Session::NAME])) {
+        if (!isset($_COOKIE[Session::name()])) {
             return null;
         }
         Session::start();

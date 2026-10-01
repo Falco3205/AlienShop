@@ -7,3 +7,6 @@
 /public/assets/theme-*.css
 /public/assets/app-*.js
 .DS_Store
+/hub/config/config.php
+/hub/storage/*
+!/hub/storage/.gitkeep

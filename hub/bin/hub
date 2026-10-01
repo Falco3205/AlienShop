@@ -1,0 +1,65 @@
+#!/usr/bin/env php
+<?php
+declare(strict_types=1);
+
+if (PHP_SAPI !== 'cli') {
+    exit(1);
+}
+require dirname(__DIR__) . '/app/bootstrap.php';
+
+use Alien\Core\Config;
+use Alien\Core\DB;
+
+$command = $argv[1] ?? '';
+$opts = [];
+foreach (array_slice($argv, 2) as $a) {
+    if (preg_match('/^--([a-z0-9-]+)(?:=(.*))?$/s', $a, $m)) {
+        $opts[$m[1]] = $m[2] ?? '1';
+    }
+}
+$opt = static fn(string $k, string $d = '') => $opts[$k] ?? (getenv('HUB_' . strtoupper(str_replace('-', '_', $k))) ?: $d);
+
+if ($command === 'install') {
+    if (Config::installed()) {
+        fwrite(STDERR, "Hub già installato.\n");
+        exit(1);
+    }
+    $errors = Hub\Installer::install([
+        'url' => $opt('url'), 'admin_email' => $opt('admin-email'), 'admin_password' => $opt('admin-password'), 'admin_name' => $opt('admin-name', 'Admin'),
+        'db' => $opt('db', 'sqlite'), 'db_host' => $opt('db-host', 'localhost'), 'db_name' => $opt('db-name'), 'db_user' => $opt('db-user'), 'db_pass' => $opt('db-pass'),
+    ]);
+    if ($errors) {
+        fwrite(STDERR, "Installazione non riuscita:\n - " . implode("\n - ", $errors) . "\n");
+        exit(1);
+    }
+    echo "Hub installato: " . Config::baseUrl() . "\n";
+    exit(0);
+}
+
+if (!Config::installed()) {
+    fwrite(STDERR, "Hub non installato. Usa: hub install --url=... --admin-email=... --admin-password=...\n");
+    exit(1);
+}
+DB::boot();
+
+switch ($command) {
+    case 'poll':
+        $r = Hub\Poller::pollAll();
+        echo sprintf("Interrogati %d negozi: %d ok, %d con errori.\n", $r['total'], $r['ok'], $r['failed']);
+        exit(0);
+    case 'user:password':
+        if (!isset($argv[2], $argv[3])) {
+            fwrite(STDERR, "Uso: hub user:password <email> <password>\n");
+            exit(1);
+        }
+        $n = DB::update('users', ['password' => password_hash($argv[3], PASSWORD_DEFAULT)], 'email = ?', [mb_strtolower($argv[2])]);
+        echo $n ? "Password aggiornata.\n" : "Utente non trovato.\n";
+        exit($n ? 0 : 1);
+    case 'update':
+        $r = Hub\SelfUpdate::run();
+        echo $r['message'] . "\n";
+        exit($r['ok'] ? 0 : 1);
+    default:
+        echo "AlienShop Hub " . ALIEN_VERSION . "\n\nComandi:\n  install --url=https://dominio/percorso --admin-email=.. --admin-password=.. [--db=mysql ...]\n  poll                       interroga tutti i negozi\n  update                     aggiorna l'hub da GitHub\n  user:password <email> <pw>\n";
+        exit($command === '' ? 0 : 1);
+}

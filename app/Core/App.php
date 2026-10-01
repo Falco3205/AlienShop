@@ -60,6 +60,7 @@ final class App
             $response = self::dispatch($req);
             if ($cacheKey && $response->status === 200 && empty($GLOBALS['as_flash_shown'])) {
                 Cache::put($cacheKey, $response->body);
+                $response->headers['X-Accel-Expires'] = '60';
             }
             self::send($response);
             if (!str_starts_with($req->path, '/webhooks/') && !str_starts_with($req->path, '/hub/')) {
@@ -224,6 +225,7 @@ final class App
         header('ETag: ' . $etag);
         header('Last-Modified: ' . gmdate('D, d M Y H:i:s', $hit['mtime']) . ' GMT');
         header('X-Cache: HIT');
+        header('X-Accel-Expires: 60');
         if (($_SERVER['HTTP_IF_NONE_MATCH'] ?? '') === $etag) {
             http_response_code(304);
             return;

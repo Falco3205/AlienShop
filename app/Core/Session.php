@@ -5,7 +5,17 @@ namespace Alien\Core;
 
 final class Session
 {
-    public const NAME = 'alien_sid';
+    public static function name(): string
+    {
+        $path = self::path();
+        return 'alien_sid' . ($path === '/' ? '' : '_' . substr(md5($path), 0, 6));
+    }
+
+    public static function path(): string
+    {
+        $p = rtrim((string)parse_url(Config::baseUrl(), PHP_URL_PATH), '/');
+        return $p === '' ? '/' : $p;
+    }
 
     public static function start(): void
     {
@@ -19,10 +29,10 @@ final class Session
         if (is_dir($dir) && is_writable($dir)) {
             session_save_path($dir);
         }
-        session_name(self::NAME);
+        session_name(self::name());
         session_set_cookie_params([
             'lifetime' => 0,
-            'path' => '/',
+            'path' => self::path(),
             'secure' => is_https(),
             'httponly' => true,
             'samesite' => 'Lax',

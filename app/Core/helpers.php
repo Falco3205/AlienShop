@@ -92,7 +92,7 @@ function flash(string $type, string $message): void
 
 function pull_flash(): array
 {
-    if (!isset($_COOKIE[Session::NAME])) {
+    if (!isset($_COOKIE[Session::name()])) {
         return [];
     }
     Session::start();

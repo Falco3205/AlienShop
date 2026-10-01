@@ -25,7 +25,7 @@ final class AuthController extends AdminController
                 $data['error'] = __('Troppi tentativi. Riprova tra qualche minuto.');
             } elseif ($user = Auth::attempt($req->str('email'), (string)($req->post['password'] ?? ''), 'admin')) {
                 Auth::login($user);
-                setcookie('as_admin', '1', ['path' => '/', 'httponly' => true, 'samesite' => 'Lax', 'secure' => is_https()]);
+                setcookie('as_admin', '1', ['path' => \Alien\Core\Session::path(), 'httponly' => true, 'samesite' => 'Lax', 'secure' => is_https()]);
                 return Response::redirect('admin');
             } else {
                 $data['error'] = __('Credenziali non valide.');
@@ -37,7 +37,7 @@ final class AuthController extends AdminController
     public function logout(): Response
     {
         Auth::logout();
-        setcookie('as_admin', '', time() - 3600, '/');
+        setcookie('as_admin', '', time() - 3600, \Alien\Core\Session::path());
         return Response::redirect('admin/login');
     }
 }

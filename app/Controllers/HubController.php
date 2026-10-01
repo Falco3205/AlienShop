@@ -69,7 +69,7 @@ final class HubController extends Controller
             return $this->missing($req);
         }
         Auth::login($admin);
-        setcookie('as_admin', '1', ['expires' => 0, 'path' => '/', 'httponly' => true, 'samesite' => 'Lax', 'secure' => is_https()]);
+        setcookie('as_admin', '1', ['expires' => 0, 'path' => \Alien\Core\Session::path(), 'httponly' => true, 'samesite' => 'Lax', 'secure' => is_https()]);
         return Response::redirect('admin');
     }
 }

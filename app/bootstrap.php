@@ -5,7 +5,7 @@ if (!defined('ROOT')) {
     define('ROOT', dirname(__DIR__));
 }
 
-const ALIEN_VERSION = '1.0.0';
+define('ALIEN_VERSION', require __DIR__ . '/version.php');
 
 mb_internal_encoding('UTF-8');
 

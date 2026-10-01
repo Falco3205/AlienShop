@@ -77,7 +77,7 @@ final class AccountController extends Controller
     {
         if (!$this->csrfFails($req)) {
             Auth::logout();
-            setcookie('as_admin', '', time() - 3600, '/');
+            setcookie('as_admin', '', time() - 3600, \Alien\Core\Session::path());
         }
         return Response::redirect(url());
     }

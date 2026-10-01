@@ -21,7 +21,7 @@ final class Cart
         $count = array_sum(array_column($items, 'qty'));
         setcookie('as_cart', (string)$count, [
             'expires' => $count ? time() + 86400 * 14 : time() - 3600,
-            'path' => '/',
+            'path' => \Alien\Core\Session::path(),
             'secure' => is_https(),
             'samesite' => 'Lax',
         ]);

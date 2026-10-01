@@ -1,0 +1,446 @@
+#!/usr/bin/env php
+<?php
+declare(strict_types=1);
+
+const AGENT_VERSION = '1.0.0';
+
+final class Node
+{
+    public array $log = [];
+    public bool $dry = false;
+    private array $cfg;
+
+    public function __construct(array $cfg, bool $dry = false)
+    {
+        $this->cfg = $cfg + ['hestia' => '/usr/local/hestia', 'users' => [], 'repo' => 'Falco3205/AlienShop', 'branch' => 'main'];
+        $this->dry = $dry;
+    }
+
+    public static function loadConfig(): array
+    {
+        $file = getenv('ALIENSHOP_NODE_CONF') ?: '/etc/alienshop/node.json';
+        $cfg = is_file($file) ? json_decode((string)file_get_contents($file), true) : null;
+        if (!is_array($cfg) || empty($cfg['hub']) || empty($cfg['token'])) {
+            fwrite(STDERR, "Configurazione mancante o incompleta: $file\n");
+            exit(1);
+        }
+        return $cfg;
+    }
+
+    public function say(string $line): void
+    {
+        $this->log[] = $line;
+        if (PHP_SAPI === 'cli' && !$this->dry) {
+            fwrite(STDOUT, $line . "\n");
+        }
+    }
+
+    public function http(string $method, string $path, array $body = []): array
+    {
+        $ctx = stream_context_create(['http' => [
+            'method' => $method,
+            'header' => "Authorization: Bearer {$this->cfg['token']}\r\nContent-Type: application/json\r\nUser-Agent: alienshop-node/" . AGENT_VERSION . "\r\n",
+            'content' => $body ? json_encode($body) : '',
+            'timeout' => 30,
+            'ignore_errors' => true,
+        ]]);
+        $raw = @file_get_contents(rtrim((string)$this->cfg['hub'], '/') . $path, false, $ctx);
+        $status = 0;
+        foreach ($http_response_header ?? [] as $h) {
+            if (preg_match('#^HTTP/\S+\s+(\d{3})#', $h, $m)) {
+                $status = (int)$m[1];
+            }
+        }
+        return ['status' => $status, 'json' => is_string($raw) ? (json_decode($raw, true) ?: []) : []];
+    }
+
+    public function info(): array
+    {
+        $mem = 0;
+        if (is_readable('/proc/meminfo')) {
+            $t = file_get_contents('/proc/meminfo');
+            if (preg_match('/MemTotal:\s+(\d+)/', $t, $a) && preg_match('/MemAvailable:\s+(\d+)/', $t, $b) && (int)$a[1] > 0) {
+                $mem = (int)round(100 - $b[1] / $a[1] * 100);
+            }
+        }
+        $disk = @disk_total_space('/') ?: 0;
+        $hestia = '';
+        $conf = $this->cfg['hestia'] . '/conf/hestia.conf';
+        if (is_readable($conf) && preg_match('/^VERSION=[\'"]?([\d.]+)/m', (string)file_get_contents($conf), $m)) {
+            $hestia = $m[1];
+        }
+        return [
+            'hostname' => gethostname() ?: '', 'os' => php_uname('s') . ' ' . php_uname('r'), 'php' => PHP_VERSION, 'agent' => AGENT_VERSION,
+            'hestia' => $hestia, 'load' => round((sys_getloadavg()[0] ?? 0), 2),
+            'disk_used_pct' => $disk ? (int)round(100 - disk_free_space('/') / $disk * 100) : 0, 'mem_used_pct' => $mem,
+        ];
+    }
+
+    public function run(): int
+    {
+        $r = $this->http('POST', '/api/node/poll', ['info' => $this->info()]);
+        if ($r['status'] !== 200) {
+            fwrite(STDERR, "Hub non raggiungibile o token non valido (HTTP {$r['status']}).\n");
+            return 1;
+        }
+        foreach ($r['json']['jobs'] ?? [] as $job) {
+            $this->execute((int)$job['id'], (string)$job['type'], (array)$job['payload']);
+        }
+        return 0;
+    }
+
+    public function execute(int $id, string $type, array $p): void
+    {
+        $this->log = [];
+        try {
+            $result = match ($type) {
+                'install_shop' => $this->installShop($p),
+                'add_edge' => $this->addEdge($p),
+                'suspend_shop' => $this->suspend($p, true),
+                'unsuspend_shop' => $this->suspend($p, false),
+                'node_update' => $this->selfUpdate(),
+                default => throw new RuntimeException('Tipo di attività sconosciuto: ' . $type),
+            };
+            $this->report($id, true, $result, '');
+        } catch (Throwable $e) {
+            $this->say('ERRORE: ' . $e->getMessage());
+            $this->report($id, false, [], $e->getMessage());
+        }
+    }
+
+    private function report(int $id, bool $ok, array $result, string $error): void
+    {
+        if ($this->dry) {
+            return;
+        }
+        $this->http('POST', '/api/node/jobs/' . $id, ['ok' => $ok, 'result' => $result, 'error' => $error, 'log' => implode("\n", $this->log)]);
+    }
+
+    public function claim(string $user, string $domain, string $path, bool $skipTemplate): int
+    {
+        $r = $this->http('POST', '/api/node/claim', ['user' => $user, 'domain' => $domain, 'path' => $path]);
+        if ($r['status'] !== 200 || empty($r['json']['payload'])) {
+            fwrite(STDERR, 'Claim rifiutato: ' . ($r['json']['error'] ?? 'HTTP ' . $r['status']) . "\n");
+            return 1;
+        }
+        $payload = $r['json']['payload'];
+        $payload['skip_template'] = $skipTemplate;
+        $this->execute((int)$r['json']['job_id'], 'install_shop', $payload);
+        return 0;
+    }
+
+    private function validate(array $p, array $rules): void
+    {
+        $patterns = [
+            'domain' => '/^(?=.{4,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,24}$/',
+            'user' => '/^[a-z][a-z0-9_-]{0,31}$/',
+            'path' => '/^([a-z0-9][a-z0-9_-]{0,40})?$/',
+            'repo' => '#^[\w.-]+/[\w.-]+$#',
+            'branch' => '#^[\w./-]{1,60}$#',
+            'theme' => '/^[a-z0-9_-]{1,40}$/',
+            'lang' => '/^(it|en)$/',
+            'secret' => '/^[0-9a-f]{20,128}$/',
+            'url' => '#^https?://[\w.\-]+(:\d+)?(/[a-z0-9_-]+)?$#',
+            'upstream' => '#^https?://[\w.\-\[\]:]+$#',
+        ];
+        foreach ($rules as $key => $kind) {
+            if (!isset($p[$key]) || !is_string($p[$key]) || !preg_match($patterns[$kind], $p[$key])) {
+                throw new RuntimeException("Parametro non valido: $key");
+            }
+        }
+        if (isset($p['hestia_user'])) {
+            $allowed = $this->cfg['users'] ?: [$this->cfg['user'] ?? ''];
+            if (!in_array($p['hestia_user'], $allowed, true)) {
+                throw new RuntimeException('Utente Hestia non autorizzato su questo server: ' . $p['hestia_user']);
+            }
+        }
+    }
+
+    public function sh(array $cmd, ?string $user = null, array $env = [], bool $mustSucceed = true): array
+    {
+        if ($user !== null) {
+            $cmd = ['runuser', '-u', $user, '--', ...$cmd];
+        }
+        $shown = implode(' ', array_map(static fn($a) => preg_match('/^[\w@%+=:,.\/-]+$/', $a) ? $a : "'" . str_replace("'", "'\\''", $a) . "'", $cmd));
+        $this->say('$ ' . $shown);
+        if ($this->dry) {
+            return [0, ''];
+        }
+        $proc = proc_open($cmd, [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, null, $env + ['PATH' => '/usr/local/hestia/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin', 'HOME' => $user ? "/home/$user" : '/root', 'GIT_TERMINAL_PROMPT' => '0', 'HESTIA' => $this->cfg['hestia']]);
+        if (!is_resource($proc)) {
+            throw new RuntimeException('Impossibile eseguire: ' . $cmd[0]);
+        }
+        $out = trim(stream_get_contents($pipes[1]) . stream_get_contents($pipes[2]));
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $code = proc_close($proc);
+        if ($out !== '') {
+            $this->say(mb_substr($out, 0, 1500));
+        }
+        if ($mustSucceed && $code !== 0) {
+            throw new RuntimeException("Comando fallito ({$cmd[0]}, codice $code)");
+        }
+        return [$code, $out];
+    }
+
+    private function hestia(string $cmd, array $args, bool $mustSucceed = true): array
+    {
+        return $this->sh([$this->cfg['hestia'] . '/bin/' . $cmd, ...$args], null, [], $mustSucceed);
+    }
+
+    private function write(string $file, string $content, int $mode = 0644, ?string $owner = null): void
+    {
+        $this->say("scrivo $file");
+        if ($this->dry) {
+            return;
+        }
+        @mkdir(dirname($file), 0755, true);
+        file_put_contents($file, $content);
+        chmod($file, $mode);
+        if ($owner) {
+            @chown($file, $owner);
+        }
+    }
+
+    private function emptyish(string $dir): bool
+    {
+        if (!is_dir($dir)) {
+            return true;
+        }
+        foreach (scandir($dir) ?: [] as $f) {
+            if (!in_array($f, ['.', '..', 'index.html', 'robots.txt', '.well-known', 'favicon.ico'], true)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    public function installShop(array $p): array
+    {
+        $this->validate($p, ['domain' => 'domain', 'hestia_user' => 'user', 'path' => 'path', 'repo' => 'repo', 'branch' => 'branch', 'theme' => 'theme', 'lang' => 'lang', 'hub_secret' => 'secret', 'url' => 'url']);
+        if (!filter_var($p['admin_email'] ?? '', FILTER_VALIDATE_EMAIL) || !isset($p['admin_password']) || strlen((string)$p['admin_password']) < 12 || !preg_match('/^[\w.~-]+$/', (string)$p['admin_password'])) {
+            throw new RuntimeException('Parametri amministratore non validi.');
+        }
+        if (!preg_match('#^https?://[\w.\-]+(:\d+)?(/[\w./-]*)?$#', (string)($p['hub_url'] ?? ''))) {
+            throw new RuntimeException('Parametro non valido: hub_url');
+        }
+        $proxies = array_values((array)($p['trusted_proxies'] ?? []));
+        foreach ($proxies as $px) {
+            if (!is_string($px) || !preg_match('#^[0-9a-fA-F:.]+(/\d{1,3})?$#', $px)) {
+                throw new RuntimeException('Proxy fidato non valido.');
+            }
+        }
+        $user = $p['hestia_user'];
+        $domain = $p['domain'];
+        $path = $p['path'];
+        $edge = ($p['mode'] ?? 'direct') === 'edge';
+        $docroot = "/home/$user/web/$domain/public_html";
+        $target = $path === '' ? $docroot : "$docroot/$path";
+        $name = (string)($p['store_name'] ?? $domain);
+        $name = trim(preg_replace('/[^\p{L}\p{N} .,&\'-]/u', '', $name) ?? '') ?: $domain;
+
+        $this->say("== Installazione di $domain" . ($path ? "/$path" : '') . " ($user)");
+        if (!$this->dry) {
+            [$code] = $this->hestia('v-list-user', [$user], false);
+            if ($code !== 0) {
+                throw new RuntimeException("L'utente Hestia $user non esiste su questo server.");
+            }
+        }
+        [$exists] = $this->hestia('v-list-web-domain', [$user, $domain], false);
+        if ($exists !== 0 || $this->dry) {
+            $this->hestia('v-add-web-domain', [$user, $domain]);
+        }
+        if (!$this->dry && !is_dir($docroot)) {
+            throw new RuntimeException("Cartella $docroot non trovata dopo la creazione del dominio.");
+        }
+
+        $reuse = is_dir("$target/.git") && !is_file("$target/config/config.php");
+        if (!$reuse && !$this->emptyish($target)) {
+            throw new RuntimeException("La cartella $target contiene già dei file: non la sovrascrivo.");
+        }
+        if ($reuse) {
+            $this->sh(['git', '-C', $target, 'pull', '--ff-only'], $user);
+        } else {
+            if ($path === '') {
+                foreach (['index.html', 'robots.txt', 'favicon.ico'] as $f) {
+                    if (!$this->dry && is_file("$docroot/$f")) {
+                        unlink("$docroot/$f");
+                    }
+                }
+            }
+            $this->sh(['git', 'clone', '--depth', '1', '-b', $p['branch'], 'https://github.com/' . $p['repo'] . '.git', $target], $user);
+        }
+
+        $slug = substr(preg_replace('/[^a-z0-9]/', '', explode('.', $domain)[0]) ?: 'shop', 0, 8) . substr(bin2hex(random_bytes(2)), 0, 3);
+        $dbPass = bin2hex(random_bytes(12));
+        $this->hestia('v-add-database', [$user, $slug, $slug, $dbPass, 'mysql']);
+        $dbName = "{$user}_{$slug}";
+
+        $conf = "/home/$user/conf/web/$domain";
+        $uploadsBlock = "location ^~ " . ($path === '' ? '' : "/$path") . "/uploads/ {\n    location ~ \\.(php|phtml|phar)\$ { return 403; }\n}\n";
+        if ($path === '') {
+            if (empty($p['skip_template'])) {
+                $this->hestia('v-change-web-domain-tpl', [$user, $domain, 'alienshop']);
+            }
+            $this->write("$conf/nginx.conf_alienshop", $uploadsBlock);
+            $this->write("$conf/nginx.ssl.conf_alienshop", $uploadsBlock);
+        } else {
+            $block = $this->subfolderBlock($user, $domain, $path, $target);
+            $this->write("$conf/nginx.conf_alienshop_$path", $block);
+            $this->write("$conf/nginx.ssl.conf_alienshop_$path", $block);
+        }
+        if (!$edge) {
+            $this->hestia('v-add-letsencrypt-domain', [$user, $domain], false);
+            $this->hestia('v-add-web-domain-ssl-force', [$user, $domain], false);
+        }
+        $this->hestia('v-restart-web', [], false);
+
+        $env = ['ALIEN_ADMIN_PASSWORD' => $p['admin_password'], 'ALIEN_DB_PASS' => $dbPass, 'ALIEN_HUB_SECRET' => $p['hub_secret'], 'ALIEN_HUB_URL' => $p['hub_url']];
+        $args = [$target . '/bin/console', 'install', '--url=' . $p['url'], '--store-name=' . $name, '--admin-email=' . $p['admin_email'],
+            '--db=mysql', '--db-host=localhost', '--db-name=' . $dbName, '--db-user=' . $dbName, '--theme=' . $p['theme'], '--lang=' . $p['lang'], '--demo=' . (int)!empty($p['demo'])];
+        if ($proxies) {
+            $args[] = '--trusted-proxies=' . implode(',', $proxies);
+        }
+        $this->sh(['php', ...$args], $user, $env);
+        $this->hestia('v-add-cron-job', [$user, '*', '*', '*', '*', '*', "php $target/bin/console cron:run"], false);
+        $this->say('== Installazione completata');
+        return ['url' => $p['url'], 'database' => $dbName];
+    }
+
+    public function subfolderBlock(string $user, string $domain, string $path, string $target): string
+    {
+        $sock = $this->phpSocket($user, $domain);
+        return <<<NGX
+location ^~ /$path/ {
+    alias $target/public/;
+    try_files \$uri @alienshop_$path;
+    location ~ \\.(php|phtml|phar)\$ { return 404; }
+}
+location = /$path { return 301 /$path/; }
+location @alienshop_$path {
+    include /etc/nginx/fastcgi_params;
+    fastcgi_pass $sock;
+    fastcgi_param SCRIPT_FILENAME $target/public/index.php;
+    fastcgi_param SCRIPT_NAME /$path/index.php;
+    fastcgi_param REQUEST_URI \$request_uri;
+}
+
+NGX;
+    }
+
+    private function phpSocket(string $user, string $domain): string
+    {
+        foreach (glob('/run/php/php*-fpm-' . $domain . '.sock') ?: [] as $s) {
+            return 'unix:' . $s;
+        }
+        $pools = glob('/etc/php/*/fpm/pool.d/' . $domain . '.conf') ?: [];
+        foreach ($pools as $f) {
+            if (preg_match('/^listen\s*=\s*(\S+)/m', (string)file_get_contents($f), $m)) {
+                return 'unix:' . $m[1];
+            }
+        }
+        return 'unix:/run/php/php-fpm-' . $domain . '.sock';
+    }
+
+    public function addEdge(array $p): array
+    {
+        $this->validate($p, ['domain' => 'domain', 'hestia_user' => 'user', 'upstream' => 'upstream']);
+        $user = $p['hestia_user'];
+        $domain = $p['domain'];
+        $this->say("== Pubblicazione di $domain tramite frontend");
+        [$exists] = $this->hestia('v-list-web-domain', [$user, $domain], false);
+        if ($exists !== 0 || $this->dry) {
+            $this->hestia('v-add-web-domain', [$user, $domain]);
+        }
+        $this->write('/etc/nginx/conf.d/alienshop-cache.conf', "proxy_cache_path /var/cache/nginx/alienshop levels=1:2 keys_zone=alienshop:50m max_size=2g inactive=7d use_temp_path=off;\n");
+        if (!$this->dry) {
+            @mkdir('/var/cache/nginx/alienshop', 0755, true);
+        }
+        $this->write("/home/$user/conf/web/$domain/alienshop_edge.inc", $this->edgeConfig($p['upstream']));
+        $this->hestia('v-change-web-domain-tpl', [$user, $domain, 'alienshop-edge']);
+        $this->hestia('v-add-letsencrypt-domain', [$user, $domain], false);
+        $this->hestia('v-add-web-domain-ssl-force', [$user, $domain], false);
+        $this->hestia('v-restart-web', [], false);
+        $this->say('== Frontend pronto');
+        return ['upstream' => $p['upstream']];
+    }
+
+    public function edgeConfig(string $upstream): string
+    {
+        $common = <<<NGX
+    proxy_pass $upstream;
+    proxy_http_version 1.1;
+    proxy_set_header Host \$host;
+    proxy_set_header X-Real-IP \$remote_addr;
+    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto \$scheme;
+    proxy_set_header X-Forwarded-Host \$host;
+    proxy_set_header Connection "";
+    proxy_connect_timeout 5s;
+NGX;
+        return <<<NGX
+client_max_body_size 64m;
+location ~ /hub/update\$ {
+$common
+    proxy_read_timeout 700s;
+    proxy_cache off;
+}
+location / {
+$common
+    proxy_read_timeout 120s;
+    proxy_cache alienshop;
+    proxy_cache_key "\$scheme\$host\$request_uri";
+    proxy_cache_bypass \$cookie_as_admin;
+    proxy_no_cache \$cookie_as_admin;
+    proxy_cache_lock on;
+    proxy_cache_use_stale error timeout updating http_500 http_502 http_503 http_504;
+    add_header X-Edge-Cache \$upstream_cache_status always;
+}
+
+NGX;
+    }
+
+    private function suspend(array $p, bool $on): array
+    {
+        $this->validate($p, ['domain' => 'domain', 'hestia_user' => 'user']);
+        $this->hestia($on ? 'v-suspend-web-domain' : 'v-unsuspend-web-domain', [$p['hestia_user'], $p['domain']]);
+        return [];
+    }
+
+    private function selfUpdate(): array
+    {
+        $dir = dirname(realpath(__FILE__) ?: __FILE__, 2);
+        $this->sh(['git', '-C', $dir, 'pull', '--ff-only']);
+        return [];
+    }
+}
+
+if (PHP_SAPI === 'cli' && isset($argv[0]) && realpath($argv[0]) === realpath(__FILE__)) {
+    $cmd = $argv[1] ?? 'run';
+    $node = new Node(Node::loadConfig(), getenv('ALIENSHOP_DRY_RUN') === '1');
+    switch ($cmd) {
+        case 'run':
+            exit($node->run());
+        case 'claim':
+            if (!isset($argv[2], $argv[3])) {
+                fwrite(STDERR, "Uso: alienshop-node claim UTENTE DOMINIO [--path=cartella] [--skip-template]\n");
+                exit(1);
+            }
+            $path = '';
+            foreach (array_slice($argv, 4) as $a) {
+                if (str_starts_with($a, '--path=')) {
+                    $path = substr($a, 7);
+                }
+            }
+            exit($node->claim($argv[2], $argv[3], $path, in_array('--skip-template', $argv, true)));
+        case 'info':
+            echo json_encode($node->info(), JSON_PRETTY_PRINT) . "\n";
+            exit(0);
+        case 'version':
+            echo AGENT_VERSION . "\n";
+            exit(0);
+        default:
+            fwrite(STDERR, "Comandi: run | claim UTENTE DOMINIO | info | version\n");
+            exit(1);
+    }
+}

@@ -1,0 +1,19 @@
+#=========================================================================#
+# AlienShop - frontend (HTTPS)                                            #
+#=========================================================================#
+server {
+    listen      %ip%:%web_ssl_port% ssl;
+    server_name %domain_idn% %alias_idn%;
+    error_log   /var/log/%web_system%/domains/%domain%.error.log error;
+
+    ssl_certificate     %ssl_pem%;
+    ssl_certificate_key %ssl_key%;
+    ssl_protocols       TLSv1.2 TLSv1.3;
+
+    location ^~ /.well-known/acme-challenge/ {
+        root %sdocroot%;
+        default_type text/plain;
+    }
+
+    include %home%/%user%/conf/web/%domain%/alienshop_edge.inc;
+}

@@ -58,6 +58,50 @@ php bin/console update:rollback    # torna alla versione precedente
 - Repository privato: inserisci un token GitHub con accesso in sola lettura. Il sito, in Git, usa invece le credenziali del `git remote`.
 - Il server web deve poter scrivere nei file del sito (su Hestia/XAMPP è già così). Su un VPS con file di proprietà di un altro utente, esegui `update` da CLI con quell'utente.
 
+## Più negozi e due VPS: AlienShop Hub
+
+Per gestire i negozi dei tuoi clienti da un unico pannello, con backend e frontend su VPS diverse.
+
+```
+                       ┌──────────────────────── Hub (pannello principale) ───────────────────────┐
+                       │  falconefabio.it/alienshop : crea negozi, vede incassi, ordini, errori    │
+                       └───────▲──────────────────────────────▲──────────────────────▲────────────┘
+                               │ lavori (ogni minuto)          │ lavori               │ dati firmati (HMAC)
+   clienti ──HTTPS──▶  VPS FRONTEND (agente) ──tunnel──▶  VPS BACKEND (agente + Hestia)  ◀── l'hub interroga ogni negozio
+                       Nginx: TLS, cache 60 s HTML,         PHP + database + admin di ogni negozio
+                       cache asset, serve la cache se       (cartella principale del dominio
+                       il backend è giù                      oppure sottocartella)
+```
+
+- **Hub**: app a parte (`hub/`) con il suo database. Mostra incassi di oggi/7/30 giorni di tutti i negozi, ordini da spedire, scorte, errori, versioni; segnala i negozi che non rispondono; apre l'admin di un negozio con un clic (accesso monouso) e lo aggiorna.
+- **Agente** (`node/alienshop-node`): gira su ogni VPS ogni minuto, chiede all'hub se ci sono lavori e li esegue con i comandi di Hestia (crea dominio, database, certificato, clona il negozio, lo installa). L'hub **non** ha password né API key di Hestia e non si collega in SSH: sono i server a collegarsi a lui. L'agente esegue solo un elenco fisso di operazioni e controlla ogni parametro (dominio, utente, cartella, repository…).
+- **Frontend**: è un proxy Nginx (template Hestia `alienshop-edge`) davanti al backend: certificato HTTPS, cache dei file statici e delle pagine pubbliche (60 s, mai per amministratori, carrelli o account), e se il backend è irraggiungibile continua a servire l'ultima pagina in cache. Il negozio riceve l'IP vero del visitatore tramite i "proxy fidati". Non è una riscrittura "headless": il negozio resta un'unica applicazione, quindi tutto ciò che c'è già continua a funzionare.
+
+### 1. Installa l'hub (una volta)
+Sul server dove vuoi il pannello (consigliato: la VPS backend), con il dominio già creato in Hestia:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Falco3205/AlienShop/main/hub/install.sh -o install-hub.sh
+sudo bash install-hub.sh --user falco3205 --domain falconefabio.it --path alienshop --admin-email tu@example.com
+```
+Installa l'hub in `/home/falco3205/web/falconefabio.it/public_html/alienshop`, lo rende raggiungibile su `https://falconefabio.it/alienshop/` (senza esporre gli altri file) e stampa la password.
+
+### 2. Collega le VPS
+Nel pannello: **Server → Collega un server**. Per il backend indica anche l'indirizzo con cui il frontend lo raggiunge attraverso il tunnel (es. `http://10.0.0.2:80`: IP privato o hostname che arriva a Nginx del backend). Il pannello mostra un comando da incollare **come root** sulla VPS: installa l'agente e i template Hestia. Fai lo stesso per il frontend.
+
+### 3. Crea un negozio
+**Negozi → Nuovo negozio**: dominio, nome, email dell'amministratore, tema e lingua; scegli se installarlo nella **cartella principale** del dominio o in una **sottocartella** (il resto del sito resta com'è), e se pubblicarlo **direttamente** o **tramite il frontend**. Entro un minuto l'agente lo installa; il pannello mostra l'esito, il registro dell'installazione e la password iniziale. Con la pubblicazione tramite frontend il dominio deve puntare (record A) all'IP del frontend.
+
+**Dominio creato direttamente in Hestia**: sul backend, scegli il template web `alienshop` quando crei il dominio: dopo pochi secondi il negozio viene installato da solo e compare nell'hub (con l'email amministratore predefinita delle Impostazioni).
+
+### Aggiornamenti e sicurezza
+- Ogni negozio si aggiorna dall'hub (pulsante nella scheda) o dal proprio pannello; l'hub stesso con `php hub/bin/hub update`.
+- L'hub parla ai negozi con richieste firmate (HMAC-SHA256 con segreto per negozio, finestra di 5 minuti); gli agenti si autenticano con un token per server (nel database solo l'hash). Chi controlla l'hub può eseguire quelle operazioni sulle VPS: proteggilo con una password lunga e HTTPS.
+- Certificati: sul frontend Let's Encrypt funziona se il dominio punta direttamente al frontend (se usi Cloudflare come proxy "arancione" davanti al frontend, usa il certificato Cloudflare o la modalità DNS-only per il rilascio).
+- Test: `php tests/run.php` (negozio), `php tests/hub.php` (hub), `php tests/node.php` (agente, in modalità prova: non esegue nulla sul server).
+
+**Non provato su un server Hestia reale**: i comandi `v-*`, i template Nginx e il tunnel Cloudflare sono scritti dalla documentazione di Hestia e verificati solo in modalità prova (comandi generati e controllati). Il resto è provato con un'installazione locale completa (hub, negozio, agente simulato): creazione negozio, lavori, raccolta dati, accesso con un clic, aggiornamento, firme e proxy fidati. Alla prima installazione reale guarda il registro dell'attività nel pannello (**Attività**).
+
 ## Installazione per tipo di hosting
 
 Regole comuni: PHP **8.1+** con le estensioni `pdo_sqlite` o `pdo_mysql`, `mbstring`, `gd`, `curl`, `openssl`, `sodium`, `dom` (e `zip`, `intl` consigliate), HTTPS attivo, e il document root sul dominio. Il wizard `/install` segnala cosa manca. Le procedure sotto sono indicative: i nomi dei menu cambiano tra versioni dei pannelli e non sono state provate su ciascuno.
