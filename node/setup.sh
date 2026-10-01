@@ -3,10 +3,11 @@
 # Uso (come root):
 #   ALIEN_NODE_TOKEN=TOKEN bash setup.sh --hub https://hub.dominio.it --role backend|edge --user UTENTE_HESTIA [--cloudflare] [--relay-secret S] [--repo utente/repo] [--branch main] [--users u1,u2]
 #   --cloudflare     legge l'IP vero dei visitatori da Cloudflare (CF-Connecting-IP) e tiene aggiornati gli intervalli di Cloudflare
+#   --tailscale      (solo backend) rende raggiungibili i siti dalla tailnet Tailscale (inoltro sull'IP Tailscale del server)
 #   --relay-secret   (solo backend) attiva il relay per il tunnel cloudflared: il frontend entra con un segreto
 set -euo pipefail
 
-HUB=""; TOKEN=""; ROLE=""; HUSER=""; REPO="Falco3205/AlienShop"; BRANCH="main"; USERS=""; CLOUDFLARE=0; RELAY_SECRET=""; RELAY_PORT="8088"
+HUB=""; TOKEN=""; ROLE=""; HUSER=""; REPO="Falco3205/AlienShop"; BRANCH="main"; USERS=""; CLOUDFLARE=0; TAILSCALE=0; RELAY_SECRET=""; RELAY_PORT="8088"
 while [ $# -gt 0 ]; do
   case "$1" in
     --hub) HUB="$2"; shift 2;;
@@ -17,6 +18,7 @@ while [ $# -gt 0 ]; do
     --branch) BRANCH="$2"; shift 2;;
     --users) USERS="$2"; shift 2;;
     --cloudflare) CLOUDFLARE=1; shift;;
+    --tailscale) TAILSCALE=1; shift;;
     --relay-secret) RELAY_SECRET="$2"; shift 2;;
     --relay-port) RELAY_PORT="$2"; shift 2;;
     *) echo "Opzione sconosciuta: $1" >&2; exit 1;;
@@ -105,6 +107,11 @@ CFSCRIPT
   /usr/local/bin/alienshop-cloudflare-ips || echo "Attenzione: impossibile scaricare gli intervalli di Cloudflare."
   printf '#!/bin/sh\n/usr/local/bin/alienshop-cloudflare-ips\n' > /etc/cron.weekly/alienshop-cloudflare
   chmod 755 /etc/cron.weekly/alienshop-cloudflare
+fi
+
+if [ "$ROLE" = "backend" ] && [ "$TAILSCALE" -eq 1 ]; then
+  echo "==> Tailscale: inoltro dalla tailnet verso i siti di Hestia"
+  HESTIA="$HESTIA" bash /opt/alienshop/node/tailnet-forwarder.sh
 fi
 
 if [ "$ROLE" = "backend" ] && [ -n "$RELAY_SECRET" ]; then

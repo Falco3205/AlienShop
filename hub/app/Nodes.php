@@ -57,6 +57,17 @@ final class Nodes
         return $token;
     }
 
+    public static function tailnet(array $node): bool
+    {
+        $host = parse_url((string)$node['upstream'], PHP_URL_HOST);
+        return is_string($host) && filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== false && \Alien\Core\Request::inRanges($host, ['100.64.0.0/10']);
+    }
+
+    public static function forwarded(array $node): bool
+    {
+        return $node['role'] === 'backend' && ($node['tunnel_host'] !== '' || self::tailnet($node));
+    }
+
     public static function find(int $id): ?array
     {
         return DB::row('SELECT * FROM nodes WHERE id = ?', [$id]);

@@ -34,7 +34,8 @@ Questo documento dice cosa è stato controllato, cosa fa il software per protegg
 - Segreti dei lavori (password iniziali, segreti) cifrati nel database dell'hub e cancellati a lavoro concluso; password e segreti oscurati nei registri dell'agente.
 - L'agente esegue solo operazioni fisse e valida ogni parametro (dominio, utente Hestia ammesso, cartella, repository, URL…) con espressioni ancorate; le regole a stringa non lasciano passare ritorni a capo.
 - Accesso a un negozio dall'hub con token monouso da 90 secondi.
-- Tunnel Cloudflare: il frontend entra nel backend solo con un **segreto del relay** (intestazione `X-Alien-Relay`, generato dall'hub, mai nei registri); chi scopre l'hostname del tunnel senza il segreto riceve 403 e non può falsificare l'IP dei visitatori. Con `--cloudflare` l'IP vero arriva da `CF-Connecting-IP`, accettato solo se la richiesta viene da un intervallo IP di Cloudflare (aggiornato ogni settimana).
+- Collegamento tra le VPS con **Tailscale** (WireGuard, ACL che consentono al frontend solo la porta 80 del backend); il backend non ha porte pubbliche e l'hub è raggiungibile solo dalla tailnet. L'hub interroga i negozi direttamente dalla tailnet, senza passare da Cloudflare.
+- Tunnel Cloudflare (alternativa, [docs/TUNNEL-CLOUDFLARE.md](docs/TUNNEL-CLOUDFLARE.md)): il frontend entra nel backend solo con un **segreto del relay** (intestazione `X-Alien-Relay`, generato dall'hub, mai nei registri); chi scopre l'hostname del tunnel senza il segreto riceve 403 e non può falsificare l'IP dei visitatori. Con `--cloudflare` l'IP vero arriva da `CF-Connecting-IP`, accettato solo se la richiesta viene da un intervallo IP di Cloudflare (aggiornato ogni settimana).
 - Wizard di installazione protetto da una chiave (`storage/install.key`) quando l'installazione è guidata dall'hub.
 
 ## Prima di andare online (checklist)
@@ -43,7 +44,7 @@ Questo documento dice cosa è stato controllato, cosa fa il software per protegg
 2. **Attiva la 2FA** su ogni amministratore (*Admin → Profilo → Sicurezza*) e sull'hub (obbligatoria di fatto: l'hub controlla le VPS).
 3. **Installa da riga di comando** (`bin/console install`) o con l'hub, non lasciando `/install` aperto su un dominio pubblico.
 4. **Document root su `public/`** (template Hestia/Nginx inclusi). Se usi Apache dalla radice, verifica che `https://tuodominio/config/config.php` e `/storage/` rispondano 403/404.
-5. **Hub su un sottodominio dedicato** (es. `hub.tuodominio.it`, `--root` nello script di installazione). Se sta sotto un percorso di un sito con altro software (WordPress…), una falla in quel sito, che ha la stessa origine, può agire sul pannello.
+5. **Hub solo in tailnet** (o almeno su un sottodominio dedicato) (es. `hub.tuodominio.it`, `--root` nello script di installazione). Se sta sotto un percorso di un sito con altro software (WordPress…), una falla in quel sito, che ha la stessa origine, può agire sul pannello.
 6. **GitHub**: attiva la 2FA sul tuo account, proteggi il branch `main` (richiedi PR o almeno blocca il force-push) e tieni **spento l'aggiornamento automatico** mentre sviluppi: chi può scrivere su `main` può eseguire codice su tutti i negozi.
 7. Backup regolari fuori dal server e **PHP aggiornato** (8.2+).
 8. Con frontend/tunnel imposta correttamente i **proxy fidati** (*IP da cui il backend vede arrivare il frontend*): senza, tutti i visitatori sembrano avere lo stesso IP e i limiti di accesso colpiscono tutti. Se Cloudflare sta davanti al frontend, configura `set_real_ip_from` con i suoi intervalli.

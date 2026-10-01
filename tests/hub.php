@@ -154,6 +154,21 @@ t('backend con tunnel Cloudflare: upstream dal hostname, segreto del relay, prox
     eq([$p['origin_host'], $p['relay_secret'], $p['upstream']], ['backend-origin.falconefabio.it', $n['relay_secret'], 'https://backend-origin.falconefabio.it']);
     eq(str_contains((string)DB::val('SELECT payload FROM jobs WHERE shop_id = ? AND type = ?', [$sid, 'add_edge']), $n['relay_secret']), false, 'segreto cifrato a riposo');
 });
+t('backend su Tailscale: proxy fidati locali e l\'hub interroga il negozio dalla tailnet con Host del dominio', function () use ($edgeId) {
+    [$id, , $err] = Nodes::create('Backend TS', 'backend', '198.51.100.8', 'http://100.101.102.103:80', 'falco3205');
+    eq($err, []);
+    $n = Nodes::find($id);
+    eq([Nodes::tailnet($n), Nodes::forwarded($n)], [true, true]);
+    eq(Nodes::tailnet(['upstream' => 'http://10.0.0.2:80']), false);
+    eq(Nodes::tailnet(['upstream' => 'http://100.128.0.1:80']), false, 'fuori da 100.64.0.0/10');
+    [$sid] = Shops::create(['name' => 'TS', 'domain' => 'ts.it', 'path' => 'negozio', 'admin_email' => 't@t.it', 'node_id' => $id, 'mode' => 'edge', 'edge_node_id' => $edgeId]);
+    $j = Jobs::claimFor($id)[0];
+    eq($j['payload']['trusted_proxies'], ['127.0.0.1', '198.51.100.8']);
+    [$url, $headers, $private] = Hub\ShopClient::target(Shops::find($sid), '/hub/stats');
+    eq([$url, $headers, $private], ['http://100.101.102.103:80/negozio/hub/stats', ['Host: ts.it', 'X-Forwarded-Proto: https'], true]);
+    [$url2, $h2, $p2] = Hub\ShopClient::target(['node_id' => 1, 'domain' => 'x.it', 'path' => ''], '/hub/stats');
+    eq([$p2, $h2], [false, []], 'senza tailnet si usa l\'indirizzo pubblico');
+});
 t('installazione fallita: stato errore con messaggio e nuovo tentativo', function () use ($backId) {
     [$id] = Shops::create(['name' => 'Verdi', 'domain' => 'verdi.it', 'admin_email' => 'v@verdi.it', 'node_id' => $backId]);
     $j = Jobs::claimFor($backId)[0];

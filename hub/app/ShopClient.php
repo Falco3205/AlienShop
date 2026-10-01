@@ -8,16 +8,25 @@ use Alien\Core\HubSign;
 
 final class ShopClient
 {
+    public static function target(array $shop, string $path): array
+    {
+        $backend = Nodes::find((int)$shop['node_id']);
+        if ($backend && Nodes::tailnet($backend)) {
+            return [rtrim((string)$backend['upstream'], '/') . ($shop['path'] !== '' ? '/' . $shop['path'] : '') . $path, ['Host: ' . $shop['domain'], 'X-Forwarded-Proto: https'], true];
+        }
+        return [Shops::url($shop) . $path, [], false];
+    }
+
     public static function call(array $shop, string $method, string $path, array $body = [], int $timeout = 15): array
     {
-        if (str_starts_with(Shops::url($shop), 'https://') && \Alien\Core\Http::publicIp(Shops::url($shop)) === null) {
+        [$url, $extra, $private] = self::target($shop, $path);
+        if (!$private && str_starts_with($url, 'https://') && Http::publicIp($url) === null) {
             return ['ok' => false, 'error' => 'Il dominio non punta a un indirizzo pubblico (DNS non ancora configurato?).'];
         }
         $secret = Shops::secret($shop);
         $raw = $body ? json_encode($body) : '';
-        $headers = HubSign::headers($secret, $method, $path, $raw);
-        $headers[] = 'Content-Type: application/json';
-        $res = Http::request($method, Shops::url($shop) . $path, $raw === '' ? null : $raw, $headers, $timeout);
+        $headers = [...HubSign::headers($secret, $method, $path, $raw), ...$extra, 'Content-Type: application/json'];
+        $res = Http::request($method, $url, $raw === '' ? null : $raw, $headers, $timeout);
         if ($res['status'] === 0) {
             return ['ok' => false, 'error' => 'Negozio non raggiungibile: ' . ($res['error'] ?: 'nessuna risposta')];
         }

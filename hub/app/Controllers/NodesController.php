@@ -75,6 +75,6 @@ final class NodesController extends Controller
         $branch = (string)Settings::get('shop_branch', 'main');
         $relay = $node['role'] === 'backend' && $node['relay_secret'] !== '' ? ' --relay-secret ' . $node['relay_secret'] : '';
         return 'curl -fsSL https://raw.githubusercontent.com/' . $repo . '/' . $branch . '/node/setup.sh -o setup.sh && sudo ALIEN_NODE_TOKEN=' . $token . ' bash setup.sh --hub ' . Config::baseUrl()
-            . ' --role ' . $node['role'] . ' --user ' . $node['hestia_user'] . ' --cloudflare' . $relay . ' --repo ' . $repo . ' --branch ' . $branch;
+            . ' --role ' . $node['role'] . ' --user ' . $node['hestia_user'] . (Nodes::tailnet($node) ? ' --tailscale' : ' --cloudflare') . $relay . ' --repo ' . $repo . ' --branch ' . $branch;
     }
 }

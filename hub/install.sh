@@ -3,11 +3,12 @@
 # Uso (come root): bash install.sh --user falco3205 --domain hub.falconefabio.it --root --admin-email tu@example.com [--repo utente/repo] [--branch main]
 #   --root   installa nella radice del dominio (CONSIGLIATO: un sottodominio dedicato isola il pannello dagli altri siti)
 #   --path X installa in una sottocartella (es. falconefabio.it/alienshop)
+#   --scheme http  indirizzo del pannello in http (hub raggiungibile solo dalla tailnet Tailscale: il traffico è già cifrato da WireGuard)
 #   --no-ssl non emette il certificato e non forza HTTPS sul server (da usare quando il traffico arriva da un tunnel Cloudflare: HTTPS è già gestito da Cloudflare)
 # La password admin viene generata e stampata (oppure imposta HUB_ADMIN_PASSWORD).
 set -euo pipefail
 
-HUSER=""; DOMAIN=""; SUBPATH="alienshop"; PATH_SET=0; NO_SSL=0; EMAIL=""; REPO="Falco3205/AlienShop"; BRANCH="main"
+HUSER=""; DOMAIN=""; SUBPATH="alienshop"; PATH_SET=0; NO_SSL=0; SCHEME="https"; EMAIL=""; REPO="Falco3205/AlienShop"; BRANCH="main"
 while [ $# -gt 0 ]; do
   case "$1" in
     --user) HUSER="$2"; shift 2;;
@@ -15,6 +16,7 @@ while [ $# -gt 0 ]; do
     --path) SUBPATH="$2"; PATH_SET=1; shift 2;;
     --root) SUBPATH=""; PATH_SET=1; shift;;
     --no-ssl) NO_SSL=1; shift;;
+    --scheme) SCHEME="$2"; shift 2;;
     --admin-email) EMAIL="$2"; shift 2;;
     --repo) REPO="$2"; shift 2;;
     --branch) BRANCH="$2"; shift 2;;
@@ -28,6 +30,7 @@ die() { echo "Errore: $*" >&2; exit 1; }
 echo "$HUSER" | grep -Eq '^[a-z][a-z0-9_-]{0,31}$' || die "utente non valido"
 echo "$DOMAIN" | grep -Eq '^([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,24}$' || die "dominio non valido"
 [ -z "$SUBPATH" ] || echo "$SUBPATH" | grep -Eq '^[a-z0-9][a-z0-9_-]{0,40}$' || die "cartella non valida"
+[ "$SCHEME" = "http" ] || [ "$SCHEME" = "https" ] || die "--scheme deve essere http o https"
 echo "$REPO" | grep -Eq '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$' || die "repository non valido"
 HESTIA="${HESTIA:-/usr/local/hestia}"
 export PATH="$HESTIA/bin:$PATH"
@@ -53,7 +56,7 @@ fi
 
 echo "==> Installazione dell'hub"
 if [ ! -f "$TARGET/hub/config/config.php" ]; then
-  HUB_ADMIN_PASSWORD="$PASSWORD" runuser -u "$HUSER" -- php "$TARGET/hub/bin/hub" install --url="https://$DOMAIN${SUBPATH:+/$SUBPATH}" --admin-email="$EMAIL"
+  HUB_ADMIN_PASSWORD="$PASSWORD" runuser -u "$HUSER" -- php "$TARGET/hub/bin/hub" install --url="$SCHEME://$DOMAIN${SUBPATH:+/$SUBPATH}" --admin-email="$EMAIL"
 fi
 
 echo "==> Nginx"
@@ -99,7 +102,7 @@ v-add-cron-job "$HUSER" '*/5' '*' '*' '*' '*' "php $TARGET/hub/bin/hub poll" >/d
 cat <<DONE
 
 Hub installato.
-  Pannello:  https://$DOMAIN/${SUBPATH:+$SUBPATH/}
+  Pannello:  $SCHEME://$DOMAIN/${SUBPATH:+$SUBPATH/}
   Utente:    $EMAIL
   Password:  $PASSWORD   (cambiala da Impostazioni)
 

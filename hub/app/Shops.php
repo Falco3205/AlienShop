@@ -86,7 +86,7 @@ final class Shops
         if ($ranges) {
             return $ranges;
         }
-        if ($backend['tunnel_host'] !== '') {
+        if (Nodes::forwarded($backend)) {
             return array_values(array_filter(['127.0.0.1', $backend['address']]));
         }
         return $edge['address'] ? [$edge['address']] : [];
