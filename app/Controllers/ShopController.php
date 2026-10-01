@@ -129,7 +129,7 @@ final class ShopController extends Controller
         if ($req->isAjax()) {
             return Response::json(['ok' => $error === null, 'message' => $message], $error === null ? 200 : 422);
         }
-        return Response::redirect('products/' . $product['slug'] . '?reviewed=' . ($error === null ? 'ok' : 'error') . '&m=' . rawurlencode($message) . '#reviews');
+        return Response::redirect('products/' . $product['slug'] . '?reviewed=' . ($error === null ? 'ok' : 'error') . '#reviews');
     }
 
     public function notify(Request $req, array $params): Response
@@ -138,7 +138,7 @@ final class ShopController extends Controller
         if (!$product || !Modules::on('stock_alerts')) {
             return $this->missing($req);
         }
-        $error = trim((string)($req->post['website'] ?? '')) !== '' ? null : \Alien\Services\StockAlerts::subscribe((int)$product['id'], $req->str('email'));
+        $error = trim((string)($req->post['website'] ?? '')) !== '' ? null : (!\Alien\Core\RateLimit::hit('notify', 10, 3600) ? __('Troppe richieste: riprova più tardi.') : \Alien\Services\StockAlerts::subscribe((int)$product['id'], $req->str('email')));
         $message = $error ?? __('Perfetto! Ti scriveremo appena sarà di nuovo disponibile.');
         if ($req->isAjax()) {
             return Response::json(['ok' => $error === null, 'message' => $message], $error === null ? 200 : 422);

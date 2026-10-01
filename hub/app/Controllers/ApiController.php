@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace Hub\Controllers;
 
 use Alien\Core\DB;
+use Alien\Core\RateLimit;
 use Alien\Core\Request;
 use Alien\Core\Response;
 use Hub\Jobs;
@@ -14,8 +15,15 @@ final class ApiController
 {
     private function node(Request $req): ?array
     {
+        if (RateLimit::blocked('nodeauth', 30, 600)) {
+            return null;
+        }
         $h = $req->header('Authorization');
-        return str_starts_with($h, 'Bearer ') ? Nodes::authenticate(trim(substr($h, 7))) : null;
+        $node = str_starts_with($h, 'Bearer ') ? Nodes::authenticate(trim(substr($h, 7))) : null;
+        if (!$node) {
+            RateLimit::hit('nodeauth', 1000, 600);
+        }
+        return $node;
     }
 
     private function json(array $data, int $status = 200): Response

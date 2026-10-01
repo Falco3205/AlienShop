@@ -20,7 +20,8 @@ done
 
 die() { echo "Errore: $*" >&2; exit 1; }
 [ "$(id -u)" -eq 0 ] || die "esegui lo script come root"
-[ -n "$HUB" ] && [ -n "$TOKEN" ] && [ -n "$HUSER" ] || die "servono --hub, --token e --user"
+TOKEN="${TOKEN:-${ALIEN_NODE_TOKEN:-}}"
+[ -n "$HUB" ] && [ -n "$TOKEN" ] && [ -n "$HUSER" ] || die "servono --hub, il token (ALIEN_NODE_TOKEN) e --user"
 [ "$ROLE" = "backend" ] || [ "$ROLE" = "edge" ] || die "--role deve essere backend o edge"
 echo "$TOKEN" | grep -Eq '^[0-9a-f]{48}$' || die "token non valido"
 echo "$REPO" | grep -Eq '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$' || die "repository non valido"

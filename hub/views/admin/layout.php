@@ -5,6 +5,7 @@ $nav = [
     'shops' => ['shops', 'Negozi', 'M6 6h15l-1.6 9H7.6L6 3H3M9 20a1 1 0 100-2 1 1 0 000 2zM18 20a1 1 0 100-2 1 1 0 000 2z'],
     'nodes' => ['nodes', 'Server', 'M3 5h18v6H3zM3 13h18v6H3zM7 8h.01M7 16h.01'],
     'jobs' => ['jobs', 'Attività', 'M12 8v4l3 2M12 21a9 9 0 100-18 9 9 0 000 18z'],
+    'security' => ['security', 'Sicurezza', 'M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z'],
     'settings' => ['settings', 'Impostazioni', 'M12 15a3 3 0 100-6 3 3 0 000 6zM12 2v3M12 19v3M2 12h3M19 12h3'],
 ];
 ?>
@@ -28,10 +29,11 @@ $nav = [
   <div class="side-foot"><form method="post" action="<?= e(url('logout')) ?>"><?= csrf_field() ?><button type="submit">Esci</button></form></div>
 </aside>
 <div class="main">
-  <header class="top"><button class="burger" type="button" onclick="document.getElementById('side').classList.toggle('open')" aria-label="menu">☰</button>
+  <header class="top"><button class="burger" type="button" data-toggle-side aria-label="menu">☰</button>
     <div class="top-title"><h1><?= e($title ?? '') ?></h1><?php if (!empty($subtitle)): ?><p><?= e($subtitle) ?></p><?php endif ?></div>
     <div class="top-actions"><?= $actions ?? '' ?></div></header>
   <div class="content">
+    <?php if (!Alien\Core\TwoFactor::enabled((int)(Alien\Core\Auth::user()['id'] ?? 0))): ?><div class="alert error"><strong>Proteggi l'hub:</strong> chi entra qui controlla le tue VPS. <a href="<?= e(url('security')) ?>">Attiva la verifica in due passaggi</a>.</div><?php endif ?>
     <?php foreach (pull_flash() as $f): ?><div class="alert <?= e($f['type']) ?>" role="status"><?= e($f['message']) ?></div><?php endforeach ?>
     <?= $content ?>
   </div>

@@ -6,6 +6,7 @@ namespace Alien\Core;
 final class ImageProcessor
 {
     private const MAX_EDGE = 2000;
+    private const MAX_PIXELS = 36_000_000;
     private const SIZES = [400, 800];
 
     public static function fromUpload(array $file, string $subdir = 'products'): ?string
@@ -24,6 +25,9 @@ final class ImageProcessor
         }
         $type = $info[2];
         if (!in_array($type, [IMAGETYPE_JPEG, IMAGETYPE_PNG, IMAGETYPE_GIF, IMAGETYPE_WEBP], true)) {
+            return null;
+        }
+        if ($info[0] < 1 || $info[1] < 1 || $info[0] * $info[1] > self::MAX_PIXELS) {
             return null;
         }
         $img = @imagecreatefromstring($data);

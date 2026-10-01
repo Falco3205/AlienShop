@@ -31,7 +31,7 @@ final class EmailsController extends AdminController
     public function design(Request $req): Response
     {
         $color = $req->str('mail_color');
-        Settings::set('mail_color', preg_match('/^#[0-9a-fA-F]{6}$/', $color) ? $color : '');
+        Settings::set('mail_color', preg_match('/^#[0-9a-fA-F]{6}$/D', $color) ? $color : '');
         Settings::set('mail_footer', mb_substr(trim((string)($req->post['mail_footer'] ?? '')), 0, 500));
         return $this->back('admin/emails', __('Aspetto delle email salvato.'));
     }

@@ -75,7 +75,7 @@ final class Imap
     {
         $res = $this->command('UID SEARCH UNSEEN');
         foreach ($res['lines'] as $l) {
-            if (preg_match('/^\* SEARCH ?(.*)$/', trim($l), $m)) {
+            if (preg_match('/^\* SEARCH ?(.*)$/D', trim($l), $m)) {
                 $uids = array_values(array_filter(array_map('intval', explode(' ', trim($m[1])))));
                 return array_slice($uids, 0, $limit);
             }

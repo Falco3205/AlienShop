@@ -40,10 +40,10 @@ final class Shops
     public static function validate(array $in): array
     {
         $errors = [];
-        if (!preg_match('/^(?=.{4,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,24}$/', $in['domain'])) {
+        if (!preg_match('/^(?=.{4,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,24}$/D', $in['domain'])) {
             $errors[] = 'Dominio non valido (es. negozio.cliente.it).';
         }
-        if ($in['path'] !== '' && !preg_match('/^[a-z0-9][a-z0-9_-]{0,40}$/', $in['path'])) {
+        if ($in['path'] !== '' && !preg_match('/^[a-z0-9][a-z0-9_-]{0,40}$/D', $in['path'])) {
             $errors[] = 'La cartella può contenere solo lettere minuscole, numeri, trattino e underscore.';
         }
         if (!in_array($in['path'], ['', 'alienshop'], true) && in_array($in['path'], ['admin', 'assets', 'uploads', 'wp-admin', 'wp-content', 'cgi-bin', 'hub', 'hestia'], true)) {
@@ -71,10 +71,16 @@ final class Shops
         if (DB::val('SELECT COUNT(*) FROM shops WHERE domain = ? AND path = ?', [$in['domain'], $in['path']])) {
             $errors[] = 'Esiste già un negozio su questo dominio e cartella.';
         }
-        if (!preg_match('/^[a-z0-9_-]{1,40}$/', $in['theme'])) {
+        if (!preg_match('/^[a-z0-9_-]{1,40}$/D', $in['theme'])) {
             $errors[] = 'Tema non valido.';
         }
         return $errors;
+    }
+
+    private static function trustedProxies(array $backend, array $edge): array
+    {
+        $ranges = array_values(array_filter(array_map('trim', explode(',', (string)$backend['trusted']))));
+        return $ranges ?: ($edge['address'] ? [$edge['address']] : []);
     }
 
     public static function installPayload(array $shop, string $password): array
@@ -90,7 +96,7 @@ final class Shops
             'store_name' => $shop['name'], 'admin_email' => $shop['admin_email'], 'admin_password' => $password,
             'theme' => $shop['theme'], 'lang' => $shop['lang'], 'demo' => (int)$shop['demo'],
             'hub_url' => Config::baseUrl(), 'hub_secret' => self::secret($shop),
-            'trusted_proxies' => $edge && $edge['address'] ? [$edge['address']] : [],
+            'trusted_proxies' => $edge ? self::trustedProxies($node, $edge) : [],
         ];
     }
 

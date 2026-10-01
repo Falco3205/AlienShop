@@ -60,7 +60,7 @@ $data = ['id' => (int)$p['id'], 'beacon' => url('t'), 'item' => Alien\Services\A
 <?php if ($p['description']): ?><section class="description prose"><h2><?= e(__('Descrizione')) ?></h2><?= $p['description'] ?></section><?php endif ?>
 <?php if (Alien\Services\Modules::on('reviews')): ?>
 <section id="reviews" class="description"><h2><?= e(__('Recensioni')) ?><?php if ($p['rating_count']): ?> <span class="stars"><span style="--r:<?= (int)$p['rating_avg'] / 50 * 100 ?>%">★★★★★</span> <small><?= e(number_format($p['rating_avg'] / 10, 1)) ?>/5 · <?= (int)$p['rating_count'] ?></small></span><?php endif ?></h2>
-  <?php if (isset($_GET['reviewed'])): ?><div class="alert alert-<?= $_GET['reviewed'] === 'ok' ? 'success' : 'error' ?>"><?= e($_GET['m'] ?? '') ?></div><?php endif ?>
+  <?php if (isset($_GET['reviewed'])): ?><div class="alert alert-<?= $_GET['reviewed'] === 'ok' ? 'success' : 'error' ?>"><?= e(($_GET['reviewed'] ?? '') === 'ok' ? ((string)setting('reviews_auto', '0') === '1' ? __('Grazie! La tua recensione è stata pubblicata.') : __('Grazie! La tua recensione sarà pubblicata dopo la moderazione.')) : __('Non è stato possibile inviare la recensione: controlla i campi e riprova.')) ?></div><?php endif ?>
   <?php foreach ($reviews as $rv): ?><article class="review"><div class="stars"><span style="--r:<?= (int)$rv['rating'] * 20 ?>%">★★★★★</span></div><strong><?= e($rv['title']) ?></strong>
     <p><?= nl2br(e($rv['body'])) ?></p><small><?= e($rv['author']) ?> · <?= e(date('d/m/Y', strtotime($rv['created_at']))) ?><?= $rv['verified'] ? ' · ✓ ' . e(__('Acquisto verificato')) : '' ?></small></article><?php endforeach ?>
   <?php if (!$reviews): ?><p class="muted"><?= e(__('Ancora nessuna recensione: scrivi la prima!')) ?></p><?php endif ?>

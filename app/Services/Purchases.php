@@ -76,8 +76,15 @@ final class Purchases
             if (preg_match('/\.zip$/i', $f['name']) && class_exists(\ZipArchive::class)) {
                 $zip = new \ZipArchive();
                 if ($zip->open($f['path']) === true) {
+                    $budget = 60_000_000;
                     for ($i = 0; $i < min($zip->numFiles, 500); $i++) {
                         $name = (string)$zip->getNameIndex($i);
+                        $stat = $zip->statIndex($i);
+                        $size = (int)($stat['size'] ?? 0);
+                        if ($size > 8_000_000 || ($budget -= $size) < 0) {
+                            $total['errors'][] = $name . ': file troppo grande';
+                            continue;
+                        }
                         if (preg_match('/\.(xml|p7m)$/i', $name) && !preg_match('/_(MT|RC|NS|MC|NE|DT|AT)_/i', $name)) {
                             $r = self::ingest((string)$zip->getFromIndex($i), $source, $name);
                             $total['added'] += $r['added'];

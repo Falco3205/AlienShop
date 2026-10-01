@@ -44,7 +44,7 @@ final class CartController extends Controller
         }
         if ($error) {
             flash('error', $error);
-            return Response::redirect($req->header('Referer') ?: 'cart');
+            return Response::redirect($req->backTo('cart'));
         }
         return Response::redirect('cart');
     }
@@ -66,6 +66,8 @@ final class CartController extends Controller
         $code = $req->str('code');
         if ($code === '') {
             Cart::removeCoupon();
+        } elseif (!\Alien\Core\RateLimit::hit('coupon', 15, 900)) {
+            flash('error', __('Troppi tentativi. Riprova tra qualche minuto.'));
         } elseif ($error = Cart::applyCoupon($code)) {
             flash('error', $error);
         } else {

@@ -144,7 +144,7 @@ final class EmailTemplates
             if ($p === '') {
                 continue;
             }
-            $alone = preg_match('/^\{(\w+)\}$/', $p, $m) && in_array($m[1], self::HTML_VARS, true);
+            $alone = preg_match('/^\{(\w+)\}$/D', $p, $m) && in_array($m[1], self::HTML_VARS, true);
             $text = nl2br(htmlspecialchars($p, ENT_QUOTES, 'UTF-8'), false);
             $text = preg_replace_callback('/\{(\w+)\}/', function ($m) use ($vars) {
                 $v = (string)($vars[$m[1]] ?? '');
@@ -210,7 +210,7 @@ final class EmailTemplates
     public static function color(): string
     {
         $c = (string)Settings::get('mail_color', '');
-        return preg_match('/^#[0-9a-fA-F]{6}$/', $c) ? $c : '#6c4cf5';
+        return preg_match('/^#[0-9a-fA-F]{6}$/D', $c) ? $c : '#6c4cf5';
     }
 
     private static function htmlVar(string $name, string $value): string

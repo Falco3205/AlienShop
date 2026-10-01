@@ -10,6 +10,9 @@ final class ShopClient
 {
     public static function call(array $shop, string $method, string $path, array $body = [], int $timeout = 15): array
     {
+        if (str_starts_with(Shops::url($shop), 'https://') && \Alien\Core\Http::publicIp(Shops::url($shop)) === null) {
+            return ['ok' => false, 'error' => 'Il dominio non punta a un indirizzo pubblico (DNS non ancora configurato?).'];
+        }
         $secret = Shops::secret($shop);
         $raw = $body ? json_encode($body) : '';
         $headers = HubSign::headers($secret, $method, $path, $raw);

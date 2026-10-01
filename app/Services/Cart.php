@@ -196,7 +196,7 @@ final class Cart
     public static function taxRate(string $country): float
     {
         foreach (preg_split('/\R+/', (string)Settings::get('tax_country_rates', '')) ?: [] as $line) {
-            if (preg_match('/^\s*([A-Za-z]{2})\s*[=:]\s*([0-9]+(?:[.,][0-9]+)?)\s*$/', $line, $m) && strtoupper($m[1]) === strtoupper($country)) {
+            if (preg_match('/^\s*([A-Za-z]{2})\s*[=:]\s*([0-9]+(?:[.,][0-9]+)?)\s*$/D', $line, $m) && strtoupper($m[1]) === strtoupper($country)) {
                 return (float)str_replace(',', '.', $m[2]);
             }
         }

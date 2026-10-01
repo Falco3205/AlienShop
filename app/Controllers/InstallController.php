@@ -21,6 +21,9 @@ final class InstallController
         Lang::load($lang);
 
         if ($req->path === '/install/test-db' && $req->isPost()) {
+            if (!Installer::keyOk($req->post)) {
+                return Response::json(['ok' => false, 'message' => __('Chiave di installazione non valida.')], 403);
+            }
             $err = Installer::testDb(Installer::dbConfig($req->post));
             return Response::json(['ok' => $err === null, 'message' => $err ?? __('Connessione riuscita')]);
         }
@@ -31,7 +34,7 @@ final class InstallController
         $errors = [];
         $data = $req->post + ['lang' => $lang];
         if ($req->isPost()) {
-            $errors = Installer::validate($req->post);
+            $errors = Installer::keyOk($req->post) ? Installer::validate($req->post) : [__('Chiave di installazione non valida.')];
             if (!$errors) {
                 try {
                     Installer::install($req->post);
@@ -51,6 +54,7 @@ final class InstallController
                 'store_name' => '', 'store_email' => '', 'currency' => 'EUR', 'country' => $lang === 'en' ? 'GB' : 'IT',
                 'tax_rate' => 22, 'prices_include_tax' => 1, 'demo' => 1, 'theme' => 'aurora', 'app_url' => Config::baseUrl(),
             ],
+            'keyRequired' => Installer::installKey() !== '',
             'requirements' => Installer::requirements(),
             'themes' => Themes::all(),
             'currencies' => Money::currencies(),

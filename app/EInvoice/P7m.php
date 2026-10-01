@@ -11,7 +11,7 @@ final class P7m
         if (str_starts_with($trim, '<')) {
             return $trim;
         }
-        $der = preg_match('/^[A-Za-z0-9+\/=\r\n]+$/', $trim) && strlen($trim) > 100 ? (string)base64_decode($trim, true) : $data;
+        $der = preg_match('/^[A-Za-z0-9+\/=\r\n]+$/D', $trim) && strlen($trim) > 100 ? (string)base64_decode($trim, true) : $data;
         if ($der === '') {
             $der = $data;
         }

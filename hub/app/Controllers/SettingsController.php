@@ -18,7 +18,7 @@ final class SettingsController extends Controller
         if ($req->isPost()) {
             $repo = $req->str('shop_repo');
             $branch = $req->str('shop_branch');
-            if (!preg_match('#^[\w.-]+/[\w.-]+$#', $repo) || !preg_match('#^[\w./-]+$#', $branch)) {
+            if (!preg_match('#^[\w.-]+/[\w.-]+$#D', $repo) || !preg_match('#^[\w./-]+$#D', $branch)) {
                 $error = 'Repository o branch non validi.';
             } elseif (!filter_var($req->str('default_admin_email'), FILTER_VALIDATE_EMAIL)) {
                 $error = 'Email predefinita non valida.';

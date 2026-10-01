@@ -42,6 +42,21 @@ final class Installer
         return true;
     }
 
+    public static function installKey(): string
+    {
+        $k = (string)getenv('ALIEN_INSTALL_KEY');
+        if ($k === '' && is_file(ROOT . '/storage/install.key')) {
+            $k = trim((string)file_get_contents(ROOT . '/storage/install.key'));
+        }
+        return $k;
+    }
+
+    public static function keyOk(array $post): bool
+    {
+        $k = self::installKey();
+        return $k === '' || hash_equals($k, (string)($post['install_key'] ?? ''));
+    }
+
     public static function dbConfig(array $d): array
     {
         if (($d['db_driver'] ?? 'sqlite') === 'mysql') {
@@ -100,8 +115,8 @@ final class Installer
         if (!filter_var($d['admin_email'] ?? '', FILTER_VALIDATE_EMAIL)) {
             $errors[] = 'Email amministratore non valida.';
         }
-        if (strlen((string)($d['admin_password'] ?? '')) < 8) {
-            $errors[] = 'La password amministratore deve avere almeno 8 caratteri.';
+        if (strlen((string)($d['admin_password'] ?? '')) < 10) {
+            $errors[] = 'La password amministratore deve avere almeno 10 caratteri.';
         }
         if (($d['admin_password'] ?? '') !== ($d['admin_password2'] ?? '')) {
             $errors[] = 'Le password non coincidono.';

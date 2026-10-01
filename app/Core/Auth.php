@@ -19,7 +19,30 @@ final class Auth
         }
         Session::start();
         $id = (int)($_SESSION['uid'] ?? 0);
+        if ($id && !self::sessionValid()) {
+            self::logout();
+            return null;
+        }
         return self::$user = $id ? DB::row('SELECT id, email, name, phone, role FROM users WHERE id = ?', [$id]) : null;
+    }
+
+    private static function sessionValid(): bool
+    {
+        $now = time();
+        $ua = hash('sha256', (string)($_SERVER['HTTP_USER_AGENT'] ?? ''));
+        if (!isset($_SESSION['ua'])) {
+            $_SESSION['ua'] = $ua;
+        }
+        $isAdminSession = (bool)($_SESSION['adm'] ?? false);
+        $idle = $isAdminSession ? 4 * 3600 : 7 * 86400;
+        $max = $isAdminSession ? 12 * 3600 : 30 * 86400;
+        if (!hash_equals((string)$_SESSION['ua'], $ua)
+            || $now - (int)($_SESSION['seen'] ?? $now) > $idle
+            || $now - (int)($_SESSION['born'] ?? $now) > $max) {
+            return false;
+        }
+        $_SESSION['seen'] = $now;
+        return true;
     }
 
     public static function isAdmin(): bool
@@ -31,6 +54,9 @@ final class Auth
     {
         Session::regenerate();
         $_SESSION['uid'] = (int)$user['id'];
+        $_SESSION['adm'] = ($user['role'] ?? '') === 'admin';
+        $_SESSION['born'] = $_SESSION['seen'] = time();
+        $_SESSION['ua'] = hash('sha256', (string)($_SERVER['HTTP_USER_AGENT'] ?? ''));
         self::$user = $user;
         self::$loaded = true;
     }
@@ -45,17 +71,23 @@ final class Auth
     public static function attempt(string $email, string $password, ?string $role = null): ?array
     {
         $ip = request()->ip();
+        $email = mb_strtolower(trim($email));
+        $accountKey = 'u:' . substr(hash('sha256', $email), 0, 24);
         DB::delete('login_attempts', 'created_at < ?', [time() - 900]);
-        if ((int)DB::val('SELECT COUNT(*) FROM login_attempts WHERE ip = ?', [$ip]) >= 8) {
+        if (RateLimit::count($ip) >= 8 || RateLimit::count($accountKey) >= 10) {
             return null;
         }
-        $user = DB::row('SELECT * FROM users WHERE email = ?', [mb_strtolower(trim($email))]);
-        $ok = $user && password_verify($password, $user['password']) && ($role === null || $user['role'] === $role);
+        $user = DB::row('SELECT * FROM users WHERE email = ?', [$email]);
+        static $dummy = null;
+        $hash = $user['password'] ?? ($dummy ??= password_hash('dummy-password', PASSWORD_DEFAULT));
+        $ok = password_verify($password, $hash) && $user && ($role === null || $user['role'] === $role);
         if (!$ok) {
             DB::insert('login_attempts', ['ip' => $ip, 'created_at' => time()]);
+            DB::insert('login_attempts', ['ip' => $accountKey, 'created_at' => time()]);
             return null;
         }
-        DB::delete('login_attempts', 'ip = ?', [$ip]);
+        RateLimit::clear($ip);
+        RateLimit::clear($accountKey);
         if (password_needs_rehash($user['password'], PASSWORD_DEFAULT)) {
             DB::update('users', ['password' => password_hash($password, PASSWORD_DEFAULT)], 'id = ?', [$user['id']]);
         }

@@ -8,5 +8,5 @@
 <form method="post" action="<?= e(url('admin/newsletter/send')) ?>"><?= csrf_field() ?>
 <?= a_input('subject', __('Oggetto'), '', 'text', ['required' => true]) ?>
 <?= a_textarea('body', __('Testo (HTML)'), '', 10, __('Il link per annullare l\'iscrizione viene aggiunto in automatico.'), true) ?>
-<div style="display:flex;gap:8px"><button class="btn sec" name="test" value="1"><?= e(__('Invia una prova a me')) ?></button><button class="btn" type="submit" onclick="return confirm('<?= e(__('Inviare la campagna a tutti gli iscritti confermati?')) ?>')">🚀 <?= e(__('Invia a %d iscritti', $counts['confirmed'])) ?></button></div></form>
+<div style="display:flex;gap:8px"><button class="btn sec" name="test" value="1"><?= e(__('Invia una prova a me')) ?></button><button class="btn" type="submit" data-confirm-click="<?= e(__('Inviare la campagna a tutti gli iscritti confermati?')) ?>">🚀 <?= e(__('Invia a %d iscritti', $counts['confirmed'])) ?></button></div></form>
 <p class="muted" style="margin-top:12px;font-size:.85rem"><?= e(__('In coda: %d · Inviate: %d', $queued, $sent)) ?></p></div></div></div>

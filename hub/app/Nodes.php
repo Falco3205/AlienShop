@@ -9,7 +9,7 @@ final class Nodes
 {
     public const ROLES = ['backend' => 'Backend (ospita i negozi)', 'edge' => 'Frontend (pubblica i negozi)'];
 
-    public static function create(string $name, string $role, string $address, string $upstream, string $hestiaUser): array
+    public static function create(string $name, string $role, string $address, string $upstream, string $hestiaUser, string $trusted = ''): array
     {
         $errors = [];
         $name = trim($name);
@@ -20,10 +20,17 @@ final class Nodes
         if (!isset(self::ROLES[$role])) {
             $errors[] = 'Ruolo non valido.';
         }
-        if ($role === 'backend' && !preg_match('#^https?://[\w.\-\[\]:]+$#', $upstream)) {
+        if ($role === 'backend' && !preg_match('#^https?://[\w.\-\[\]:]+$#D', $upstream)) {
             $errors[] = 'Indirizzo del backend raggiungibile dal frontend non valido (es. http://10.0.0.2:80).';
         }
-        if (!preg_match('/^[a-z][a-z0-9_-]{0,31}$/', $hestiaUser)) {
+        $trusted = trim($trusted);
+        foreach (array_filter(array_map('trim', explode(',', $trusted))) as $range) {
+            if (!preg_match('#^[0-9a-fA-F:.]+(/\d{1,3})?$#D', $range)) {
+                $errors[] = 'Intervallo IP del frontend non valido (es. 10.0.0.0/24, separati da virgola).';
+                break;
+            }
+        }
+        if (!preg_match('/^[a-z][a-z0-9_-]{0,31}$/D', $hestiaUser)) {
             $errors[] = 'Utente Hestia non valido.';
         }
         if ($errors) {
@@ -32,7 +39,7 @@ final class Nodes
         $token = bin2hex(random_bytes(24));
         $id = DB::insert('nodes', [
             'name' => $name, 'role' => $role, 'token_hash' => hash('sha256', $token), 'address' => trim($address),
-            'upstream' => $role === 'backend' ? $upstream : '', 'hestia_user' => $hestiaUser, 'created_at' => now(),
+            'upstream' => $role === 'backend' ? $upstream : '', 'trusted' => $role === 'backend' ? $trusted : '', 'hestia_user' => $hestiaUser, 'created_at' => now(),
         ]);
         return [$id, $token, []];
     }
@@ -51,7 +58,7 @@ final class Nodes
 
     public static function authenticate(string $bearer): ?array
     {
-        if (!preg_match('/^[0-9a-f]{48}$/', $bearer)) {
+        if (!preg_match('/^[0-9a-f]{48}$/D', $bearer)) {
             return null;
         }
         return DB::row('SELECT * FROM nodes WHERE token_hash = ?', [hash('sha256', $bearer)]);

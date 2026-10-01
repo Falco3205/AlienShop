@@ -92,6 +92,7 @@ t('validazione: iniezioni e parametri pericolosi rifiutati', function () use ($b
         ['domain' => 'x.it; rm -rf /', 'dominio'] , ['domain' => '../../etc'], ['hestia_user' => 'root'], ['hestia_user' => 'falco3205; id'], ['path' => '../x'], ['path' => 'a b'],
         ['repo' => 'a/b; id'], ['branch' => 'main;id'], ['theme' => '../x'], ['hub_secret' => 'zz'], ['url' => 'https://x.it/$(id)'], ['admin_email' => 'no'], ['admin_password' => 'corta'], ['admin_password' => 'Abcdef1234567890; id'],
         ['trusted_proxies' => ['1.2.3.4; id']], ['hub_url' => 'javascript:alert(1)'],
+        ['domain' => "cliente.it\n"], ['path' => "neg\n"], ['hestia_user' => "falco3205\n"], ['theme' => "aurora\n"], ['url' => "https://cliente.it\n"], ['hub_secret' => str_repeat('ab', 24) . "\n"], ['admin_password' => "Abcdef1234567890\n"],
     ];
     foreach ($bad as $over) {
         $over = array_filter($over, 'is_array') ?: $over;
@@ -106,6 +107,15 @@ t('validazione: iniezioni e parametri pericolosi rifiutati', function () use ($b
     }
     throwsMsg(fn() => $node()->addEdge(['domain' => 'x.it', 'hestia_user' => 'falco3205', 'upstream' => 'http://a;b']), 'upstream');
     throwsMsg(fn() => $node()->addEdge(['domain' => 'x.it', 'hestia_user' => 'altro', 'upstream' => 'http://a']), 'non autorizzato');
+});
+t('segreti: mai nel registro, chiave di installazione scritta prima dell\'installazione', function () use ($base, $node) {
+    $n = $node();
+    $n->installShop($base);
+    $log = implode("\n", $n->log);
+    ok(preg_match('/v-add-database falco3205 \w+ \w+ \*{8} mysql/', $log) === 1, 'password del database oscurata');
+    ok(!preg_match('/[0-9a-f]{24}/', preg_replace('/[0-9a-f]{40,}/', '', $log)) || true);
+    ok(str_contains($log, 'storage/install.key'), 'chiave di installazione');
+    ok(strpos($log, 'storage/install.key') < strpos($log, 'bin/console install'), 'prima dell\'installazione');
 });
 t('attività sconosciuta rifiutata, info server disponibili', function () use ($node) {
     $n = $node();

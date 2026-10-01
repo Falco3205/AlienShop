@@ -41,7 +41,7 @@ final class InvoiceData
         if ($s['email'] !== '' && (!filter_var($s['email'], FILTER_VALIDATE_EMAIL) || strlen($s['email']) < 7)) {
             $e[] = __('L\'email non è valida (minimo 7 caratteri).');
         }
-        if ($s['phone'] !== '' && !preg_match('/^[+0-9 ]{5,12}$/', $s['phone'])) {
+        if ($s['phone'] !== '' && !preg_match('/^[+0-9 ]{5,12}$/D', $s['phone'])) {
             $e[] = __('Il telefono deve avere da 5 a 12 caratteri (solo numeri).');
         }
         return $e;

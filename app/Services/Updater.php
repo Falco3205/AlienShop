@@ -16,13 +16,13 @@ final class Updater
     public static function repo(): string
     {
         $r = trim((string)Settings::get('update_repo', 'Falco3205/AlienShop'));
-        return preg_match('#^[\w.-]+/[\w.-]+$#', $r) ? $r : 'Falco3205/AlienShop';
+        return preg_match('#^[\w.-]+/[\w.-]+$#D', $r) ? $r : 'Falco3205/AlienShop';
     }
 
     public static function branch(): string
     {
         $b = trim((string)Settings::get('update_branch', 'main'));
-        return preg_match('#^[\w./-]+$#', $b) && !str_contains($b, '..') ? $b : 'main';
+        return preg_match('#^[\w./-]+$#D', $b) && !str_contains($b, '..') ? $b : 'main';
     }
 
     private static function token(): string
@@ -127,7 +127,7 @@ final class Updater
     {
         if (self::gitAvailable($root)) {
             [$code, $sha] = self::git($root, ['rev-parse', 'HEAD']);
-            if ($code === 0 && preg_match('/^[0-9a-f]{40}$/', $sha)) {
+            if ($code === 0 && preg_match('/^[0-9a-f]{40}$/D', $sha)) {
                 return $sha;
             }
         }
@@ -167,7 +167,7 @@ final class Updater
 
     public static function changes(string $from, string $to): array
     {
-        if (!preg_match('/^[0-9a-f]{40}$/', $from) || !preg_match('/^[0-9a-f]{40}$/', $to)) {
+        if (!preg_match('/^[0-9a-f]{40}$/D', $from) || !preg_match('/^[0-9a-f]{40}$/D', $to)) {
             return ['status' => 'unknown', 'commits' => []];
         }
         $res = Http::request('GET', 'https://api.github.com/repos/' . self::repo() . '/compare/' . $from . '...' . $to, null, self::headers(), 15);
@@ -301,7 +301,7 @@ final class Updater
         $zip = $root . '/storage/tmp/update-' . bin2hex(random_bytes(4)) . '.zip';
         file_put_contents($zip, $data);
         try {
-            self::applyZip($zip, $root, (string)$latest['sha']);
+            self::applyZip($zip, $root, (string)$latest['sha'], substr((string)$latest['sha'], 0, 7));
         } catch (\RuntimeException $e) {
             return ['ok' => false, 'message' => $e->getMessage()];
         } finally {
@@ -310,7 +310,7 @@ final class Updater
         return ['ok' => true, 'sha' => (string)$latest['sha'], 'message' => ''];
     }
 
-    public static function applyZip(string $zipPath, string $root, string $sha = ''): void
+    public static function applyZip(string $zipPath, string $root, string $sha = '', string $expectShort = ''): void
     {
         $za = new \ZipArchive();
         if ($za->open($zipPath) !== true) {
@@ -318,6 +318,9 @@ final class Updater
         }
         $first = (string)$za->getNameIndex(0);
         $prefix = str_contains($first, '/') ? substr($first, 0, strpos($first, '/') + 1) : '';
+        if ($expectShort !== '' && !str_ends_with(rtrim($prefix, '/'), $expectShort)) {
+            throw new \RuntimeException(__('Il pacchetto scaricato non corrisponde alla versione richiesta.'));
+        }
         $stage = $root . '/storage/tmp/stage-' . bin2hex(random_bytes(4));
         $new = [];
         try {
@@ -419,7 +422,7 @@ final class Updater
         $state = self::state($root);
         if (self::method($root) === 'git') {
             $prev = (string)($state['previous'] ?? '');
-            if (!preg_match('/^[0-9a-f]{40}$/', $prev)) {
+            if (!preg_match('/^[0-9a-f]{40}$/D', $prev)) {
                 return ['ok' => false, 'message' => __('Nessuna versione precedente a cui tornare.')];
             }
             [$code, $out] = self::git($root, ['reset', '--hard', $prev]);

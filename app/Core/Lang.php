@@ -10,6 +10,7 @@ final class Lang
 
     public static function load(string $locale): void
     {
+        $locale = preg_match('/^[a-z]{2}\z/', $locale) ? $locale : 'it';
         self::$locale = $locale;
         $file = ROOT . '/lang/' . $locale . '.php';
         self::$map = $locale !== 'it' && is_file($file) ? (require $file) : [];

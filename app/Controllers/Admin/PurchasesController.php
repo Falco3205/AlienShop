@@ -76,7 +76,7 @@ final class PurchasesController extends AdminController
             DB::update('purchase_invoices', [
                 'category' => mb_substr($req->str('category'), 0, 80),
                 'deductible' => max(0, min(100, $req->int('deductible', 100))),
-                'paid_at' => preg_match('/^\d{4}-\d{2}-\d{2}$/', $req->str('paid_at')) ? $req->str('paid_at') : null,
+                'paid_at' => preg_match('/^\d{4}-\d{2}-\d{2}$/D', $req->str('paid_at')) ? $req->str('paid_at') : null,
                 'notes' => $req->str('notes'),
             ], 'id = ?', [$row['id']]);
             return $this->back('admin/purchases/' . $row['id'], __('Fattura aggiornata.'));

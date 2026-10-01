@@ -72,7 +72,7 @@ final class StripeGateway extends Gateway
         if ($order['payment_status'] === 'paid') {
             return true;
         }
-        if (!preg_match('/^cs_[A-Za-z0-9_]+$/', $sid)) {
+        if (!preg_match('/^cs_[A-Za-z0-9_]+$/D', $sid)) {
             return false;
         }
         $res = $this->call('GET', '/checkout/sessions/' . $sid);
@@ -93,6 +93,9 @@ final class StripeGateway extends Gateway
 
     public static function verifySignature(string $payload, string $header, string $secret, int $tolerance = 300, ?int $now = null): bool
     {
+        if ($secret === '') {
+            return false;
+        }
         $t = null;
         $sigs = [];
         foreach (explode(',', $header) as $part) {

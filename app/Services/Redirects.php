@@ -34,7 +34,7 @@ final class Redirects
     public static function logMissing(string $path): void
     {
         $path = self::normalize($path);
-        if ($path === '' || strlen($path) > 480 || preg_match('#^(assets|uploads|admin|wp-|\.)|\.(php|js|css|map|ico|png|jpg|webp|svg|txt|xml)$#i', $path)) {
+        if ($path === '' || strlen($path) > 480 || preg_match('#^(assets|uploads|admin|wp-|\.)|\.(php|js|css|map|ico|png|jpg|webp|svg|txt|xml)$#iD', $path)) {
             return;
         }
         try {

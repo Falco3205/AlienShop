@@ -1,4 +1,8 @@
 Options -Indexes
+ServerSignature Off
+<FilesMatch "(^\.|\.(sql|sqlite|sqlite3|log|sh|bak|lock|key|md|dist|yml|yaml|json|neon)$)">
+    Require all denied
+</FilesMatch>
 <IfModule mod_rewrite.c>
 RewriteEngine On
 RewriteRule ^(app|config|database|storage|themes|views|bin|tests|lang|hub|node|docs)(/|$) - [F,L]

@@ -18,7 +18,7 @@ final class TeamController extends AdminController
             $password = (string)($req->post['password'] ?? '');
             $error = match (true) {
                 !filter_var($email, FILTER_VALIDATE_EMAIL) => __('Inserisci un indirizzo email valido.'),
-                strlen($password) < 8 => __('La password deve avere almeno 8 caratteri.'),
+                strlen($password) < 10 => __('La password deve avere almeno 10 caratteri.'),
                 (bool)DB::row('SELECT id FROM users WHERE email = ?', [$email]) => __('Esiste già un account con questa email.'),
                 default => null,
             };

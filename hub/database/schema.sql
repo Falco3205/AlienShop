@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS nodes (
   token_hash VARCHAR(64) NOT NULL,
   address VARCHAR(190) NOT NULL DEFAULT '',
   upstream VARCHAR(190) NOT NULL DEFAULT '',
+  trusted VARCHAR(190) NOT NULL DEFAULT '',
   hestia_user VARCHAR(60) NOT NULL DEFAULT '',
   info TEXT,
   last_seen VARCHAR(19),

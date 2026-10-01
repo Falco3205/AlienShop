@@ -4,8 +4,8 @@
   <?php if ($shop['status'] === 'active'): ?>
   <form method="post" action="<?= e(url('shops/' . $shop['id'] . '/open')) ?>"><?= csrf_field() ?><button class="btn sm" type="submit">Apri l'admin del negozio</button></form>
   <form method="post" action="<?= e(url('shops/' . $shop['id'] . '/poll')) ?>"><?= csrf_field() ?><button class="btn sec sm" type="submit">Aggiorna i dati</button></form>
-  <form method="post" action="<?= e(url('shops/' . $shop['id'] . '/update')) ?>" onsubmit="return confirm('Aggiornare questo negozio all\'ultima versione?')"><?= csrf_field() ?><button class="btn sec sm" type="submit">Aggiorna il software<?= !empty($m['update_available']) ? ' ●' : '' ?></button></form>
-  <form method="post" action="<?= e(url('shops/' . $shop['id'] . '/suspend')) ?>" onsubmit="return confirm('Sospendere il sito? Non sarà più raggiungibile.')"><?= csrf_field() ?><button class="btn sec sm" type="submit">Sospendi</button></form>
+  <form method="post" action="<?= e(url('shops/' . $shop['id'] . '/update')) ?>" data-confirm="Aggiornare questo negozio all&#039;ultima versione?"><?= csrf_field() ?><button class="btn sec sm" type="submit">Aggiorna il software<?= !empty($m['update_available']) ? ' ●' : '' ?></button></form>
+  <form method="post" action="<?= e(url('shops/' . $shop['id'] . '/suspend')) ?>" data-confirm="Sospendere il sito? Non sarà più raggiungibile."><?= csrf_field() ?><button class="btn sec sm" type="submit">Sospendi</button></form>
   <?php elseif ($shop['status'] === 'suspended'): ?>
   <form method="post" action="<?= e(url('shops/' . $shop['id'] . '/unsuspend')) ?>"><?= csrf_field() ?><button class="btn sm" type="submit">Riattiva</button></form>
   <?php elseif ($shop['status'] === 'error'): ?>

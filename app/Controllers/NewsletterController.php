@@ -23,7 +23,7 @@ final class NewsletterController extends Controller
         if (!Modules::on('newsletter')) {
             return $this->missing($req);
         }
-        $error = trim((string)($req->post['website'] ?? '')) !== '' ? null : Newsletter::subscribe($req->str('email'), '', 'footer');
+        $error = trim((string)($req->post['website'] ?? '')) !== '' ? null : (!\Alien\Core\RateLimit::hit('newsletter', 8, 3600) ? __('Troppe richieste: riprova più tardi.') : Newsletter::subscribe($req->str('email'), '', 'footer'));
         $text = $error ?? __('Controlla la tua email: ti abbiamo inviato un link per confermare l\'iscrizione.');
         if ($req->isAjax()) {
             return Response::json(['ok' => $error === null, 'message' => $text], $error === null ? 200 : 422);

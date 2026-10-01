@@ -137,9 +137,22 @@ final class Str
         if ($v === '' || preg_match('#^(https?:|mailto:|tel:|/|\#|\?|\./|\.\./)#', $v)) {
             return true;
         }
-        if ($name === 'src' && preg_match('#^data:image/(png|jpe?g|gif|webp);base64,[a-z0-9+/=]+$#', $v)) {
+        if ($name === 'src' && preg_match('#^data:image/(png|jpe?g|gif|webp);base64,[a-z0-9+/=]+$#D', $v)) {
             return true;
         }
         return !preg_match('#^[a-z][a-z0-9+.\-]*:#', $v);
+    }
+
+    public static function csvCell(mixed $v): mixed
+    {
+        if (!is_string($v) || $v === '' || is_numeric($v)) {
+            return $v;
+        }
+        return in_array($v[0], ['=', '+', '-', '@', "\t", "\r"], true) ? "'" . $v : $v;
+    }
+
+    public static function csvRow(array $row): array
+    {
+        return array_map([self::class, 'csvCell'], $row);
     }
 }

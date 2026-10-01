@@ -81,6 +81,9 @@ final class CheckoutController extends Controller
         if (!$lines) {
             return Response::redirect('cart');
         }
+        if (!\Alien\Core\RateLimit::hit('order', 12, 3600)) {
+            return $this->fail($req, [__('Troppi ordini da questa connessione. Riprova più tardi.')]);
+        }
         $in = fn(string $k) => mb_substr($req->str($k), 0, 190);
         $errors = [];
         $email = mb_strtolower($in('email'));

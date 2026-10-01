@@ -26,7 +26,7 @@ final class XmlBuilder
             . '<Nazione>' . $x($p['country'] ?? 'IT') . '</Nazione></Sede>';
 
         $sellerVat = preg_replace('/\D/', '', $s['vat']) ?? '';
-        $tel = preg_match('/^[+0-9 ]{5,12}$/', $s['phone']) ? $s['phone'] : '';
+        $tel = preg_match('/^[+0-9 ]{5,12}$/D', $s['phone']) ? $s['phone'] : '';
         $mail = strlen($s['email']) >= 7 ? $s['email'] : '';
         $recipient = $c['sdi'] !== '' ? strtoupper($c['sdi']) : (($c['country'] ?? 'IT') !== 'IT' ? 'XXXXXXX' : '0000000');
         $xml = '<?xml version="1.0" encoding="UTF-8"?>' . "\n"

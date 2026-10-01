@@ -9,6 +9,10 @@ final class Mailer
     {
         $from = (string)Settings::get('mail_from', Settings::get('store_email', 'noreply@localhost'));
         $fromName = (string)Settings::get('store_name', 'AlienShop');
+        if (preg_match('/[\r\n\0]/', $to . $from . $replyTo) || !filter_var($to, FILTER_VALIDATE_EMAIL)) {
+            self::log($to, '[RIFIUTATA] ' . $subject, 'Indirizzo non valido.');
+            return false;
+        }
         [$text, $headers, $body] = self::compose($from, $fromName, $html, $attachments);
         if ($replyTo !== '' && filter_var($replyTo, FILTER_VALIDATE_EMAIL)) {
             $headers[] = 'Reply-To: ' . $replyTo;

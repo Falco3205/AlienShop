@@ -136,3 +136,9 @@ function json_flags(): int
 {
     return JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP;
 }
+
+function csp_nonce(): string
+{
+    static $nonce = null;
+    return $nonce ??= rtrim(strtr(base64_encode(random_bytes(18)), '+/', '-_'), '=');
+}

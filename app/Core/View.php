@@ -16,7 +16,7 @@ final class View
     public static function theme(): string
     {
         $t = self::$override ?? (string)Settings::get('theme', 'aurora');
-        return preg_match('/^[a-z0-9_-]+$/', $t) && is_dir(ROOT . '/themes/' . $t) ? $t : 'aurora';
+        return preg_match('/^[a-z0-9_-]+$/D', $t) && is_dir(ROOT . '/themes/' . $t) ? $t : 'aurora';
     }
 
     public static function resolve(string $name): string

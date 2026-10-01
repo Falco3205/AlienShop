@@ -55,6 +55,15 @@ switch ($command) {
         $n = DB::update('users', ['password' => password_hash($argv[3], PASSWORD_DEFAULT)], 'email = ?', [mb_strtolower($argv[2])]);
         echo $n ? "Password aggiornata.\n" : "Utente non trovato.\n";
         exit($n ? 0 : 1);
+    case 'user:2fa-off':
+        $uid = (int)DB::val('SELECT id FROM users WHERE email = ?', [mb_strtolower((string)($argv[2] ?? ''))]);
+        if (!$uid) {
+            fwrite(STDERR, "Utente non trovato.\n");
+            exit(1);
+        }
+        Alien\Core\TwoFactor::disable($uid);
+        echo "Verifica in due passaggi disattivata.\n";
+        exit(0);
     case 'update':
         $r = Hub\SelfUpdate::run();
         echo $r['message'] . "\n";

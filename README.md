@@ -86,6 +86,8 @@ sudo bash install-hub.sh --user falco3205 --domain falconefabio.it --path aliens
 ```
 Installa l'hub in `/home/falco3205/web/falconefabio.it/public_html/alienshop`, lo rende raggiungibile su `https://falconefabio.it/alienshop/` (senza esporre gli altri file) e stampa la password.
 
+> **Consigliato per la sicurezza**: un sottodominio dedicato (`--domain hub.falconefabio.it --root`, dopo averlo creato in Hestia). Un pannello in una cartella dello stesso dominio di un altro sito (WordPress, ecc.) ha la stessa "origine": una falla in quel sito potrebbe agire sul pannello. Subito dopo il primo accesso attiva la verifica in due passaggi (*Sicurezza*).
+
 ### 2. Collega le VPS
 Nel pannello: **Server → Collega un server**. Per il backend indica anche l'indirizzo con cui il frontend lo raggiunge attraverso il tunnel (es. `http://10.0.0.2:80`: IP privato o hostname che arriva a Nginx del backend). Il pannello mostra un comando da incollare **come root** sulla VPS: installa l'agente e i template Hestia. Fai lo stesso per il frontend.
 
@@ -265,7 +267,7 @@ php tests/run.php                  # suite di test
 
 ## Sicurezza
 
-Password con `password_hash`, token CSRF su checkout/account/admin e controllo dell'origine sulle azioni del carrello, query preparate, escape dell'output, sanitizzazione dell'HTML, upload ricodificati con GD (nessun file originale servito), blocco SSRF nel download immagini, limite ai tentativi di login, header di sicurezza, cartelle `app/`, `config/`, `storage/` non esposte.
+Verifica in due passaggi per gli amministratori, blocco dei tentativi per IP e per account, sessioni con scadenza, CSRF, Content-Security-Policy (rigida e con nonce nell'admin), query preparate, escape e sanitizzazione dell'HTML, upload ricodificati, anti-SSRF, firme HMAC con nonce tra hub e negozi, segreti cifrati a riposo, esportazioni CSV protette. **Leggi `SECURITY.md`**: elenca cosa è protetto, la checklist da seguire prima di andare online e i rischi che restano (ad esempio: installa l'hub su un sottodominio dedicato e attiva la 2FA su ogni admin).
 
 ## Pagamenti: configurazione
 

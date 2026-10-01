@@ -5,6 +5,8 @@ namespace Hub\Controllers;
 
 use Alien\Core\Auth;
 use Alien\Core\Csrf;
+use Alien\Core\RateLimit;
+use Alien\Core\TwoFactor;
 use Alien\Core\Request;
 use Alien\Core\Response;
 use Alien\Core\View;
@@ -24,6 +26,10 @@ final class AuthController extends Controller
             } elseif (Auth::tooManyAttempts()) {
                 $data['error'] = 'Troppi tentativi. Riprova tra qualche minuto.';
             } elseif ($user = Auth::attempt($req->str('email'), (string)($req->post['password'] ?? ''), 'admin')) {
+                if (TwoFactor::enabled((int)$user['id'])) {
+                    TwoFactor::startChallenge($user);
+                    return Response::redirect('login/2fa', 303);
+                }
                 Auth::login($user);
                 return Response::redirect('', 303);
             } else {
@@ -31,6 +37,30 @@ final class AuthController extends Controller
             }
         }
         return new Response(View::admin('login', $data, false), 200, ['Content-Type' => 'text/html; charset=utf-8', 'Cache-Control' => 'private, no-store']);
+    }
+
+    public function twoFactor(Request $req): Response
+    {
+        $user = TwoFactor::challengeUser();
+        if (!$user) {
+            return Response::redirect('login', 303);
+        }
+        $data = [];
+        if ($req->isPost()) {
+            if (!Csrf::valid($req)) {
+                $data['error'] = 'Sessione scaduta, riprova.';
+            } elseif (!RateLimit::hitKey('2fa:' . $user['id'], 6, 900)) {
+                $data['error'] = 'Troppi tentativi. Riprova tra qualche minuto.';
+            } elseif (TwoFactor::check((int)$user['id'], $req->str('code'))) {
+                TwoFactor::clearChallenge();
+                RateLimit::clear('2fa:' . $user['id']);
+                Auth::login($user);
+                return Response::redirect('', 303);
+            } else {
+                $data['error'] = 'Codice non valido.';
+            }
+        }
+        return new Response(View::admin('login-2fa', $data, false), 200, ['Content-Type' => 'text/html; charset=utf-8', 'Cache-Control' => 'private, no-store']);
     }
 
     public function logout(): Response

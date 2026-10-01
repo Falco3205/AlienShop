@@ -159,7 +159,7 @@ final class Invoices
         foreach (DB::all("SELECT * FROM orders WHERE invoice_number <> '' AND invoice_date >= ? AND invoice_date <= ? ORDER BY invoice_date", [$from . ' 00:00:00', $to . ' 23:59:59']) as $o) {
             $addr = json_decode((string)$o['billing'], true) ?: [];
             $dec = static fn(int $c) => Money::input($c);
-            fputcsv($fh, [$o['invoice_number'], substr((string)$o['invoice_date'], 0, 10), $o['number'], $o['email'], $addr['country'] ?? '', $dec((int)$o['total'] - (int)$o['tax']), $dec((int)$o['tax']), $dec((int)$o['total']), $o['currency'], $o['payment_method'], $o['status']], ',', '"', '\\');
+            fputcsv($fh, \Alien\Core\Str::csvRow([$o['invoice_number'], substr((string)$o['invoice_date'], 0, 10), $o['number'], $o['email'], $addr['country'] ?? '', $dec((int)$o['total'] - (int)$o['tax']), $dec((int)$o['tax']), $dec((int)$o['total']), $o['currency'], $o['payment_method'], $o['status']]), ',', '"', '\\');
         }
         rewind($fh);
         return (string)stream_get_contents($fh);

@@ -24,7 +24,7 @@ final class Routes
                     }
                     if ($req->isPost() && !Csrf::valid($req)) {
                         flash('error', __('Sessione scaduta, riprova.'));
-                        return Response::redirect($req->header('Referer') ?: 'admin');
+                        return Response::redirect($req->backTo('admin'));
                     }
                 }
                 $res = (new $class())->$action($req, $params);
@@ -44,6 +44,7 @@ final class Routes
         $add('POST', '/admin/remove-demo', DashboardController::class, 'removeDemo');
         $add('GET', '/admin/search', SearchController::class, 'index');
         $both('/admin/login', AuthController::class, 'login', true);
+        $both('/admin/login/2fa', AuthController::class, 'twoFactor', true);
         $add('POST', '/admin/logout', AuthController::class, 'logout');
 
         $add('GET', '/admin/products', ProductsController::class, 'index');
@@ -104,6 +105,12 @@ final class Routes
         $add('POST', '/admin/updates/apply', UpdatesController::class, 'apply');
         $add('POST', '/admin/updates/rollback', UpdatesController::class, 'rollback');
         $add('POST', '/admin/updates/settings', UpdatesController::class, 'settings');
+        $add('GET', '/admin/security', SecurityController::class, 'index');
+        $add('POST', '/admin/security/csp', SecurityController::class, 'csp');
+        $add('POST', '/admin/security/2fa/start', SecurityController::class, 'start');
+        $add('POST', '/admin/security/2fa/confirm', SecurityController::class, 'confirm');
+        $add('POST', '/admin/security/2fa/disable', SecurityController::class, 'disable');
+        $add('POST', '/admin/security/2fa/recovery', SecurityController::class, 'recovery');
         $add('GET', '/admin/backup', BackupController::class, 'index');
         $add('POST', '/admin/backup/download', BackupController::class, 'download');
         $add('GET', '/admin/modules', ModulesController::class, 'index');

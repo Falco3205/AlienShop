@@ -11,6 +11,7 @@ foreach ($requirements as [, $ok, $required]) { if ($required && !$ok) { $allOk 
 <?php if ($errors): ?><div class="errors" role="alert"><ul><?php foreach ($errors as $err): ?><li><?= e($err) ?></li><?php endforeach ?></ul></div><?php endif ?>
 <form method="post" action="<?= e(url('install')) ?>" id="wizard" autocomplete="off">
 <input type="hidden" name="lang" value="<?= e($lang) ?>">
+<?php if (!empty($keyRequired)): ?><div class="field"><label><?= e(__('Chiave di installazione')) ?></label><input type="password" name="install_key" autocomplete="off" required><div class="hint"><?= e(__('La trovi nel file storage/install.key sul server.')) ?></div></div><?php endif ?>
 
 <section class="step active" data-step="1">
   <h2>1. <?= e(__('Requisiti di sistema')) ?></h2>
@@ -73,7 +74,7 @@ foreach ($requirements as [, $ok, $required]) { if ($required && !$ok) { $allOk 
   <button type="submit" class="btn" id="submit" hidden><?= e(__('Installa')) ?></button>
 </div>
 </form>
-<script>
+<script nonce="<?= e(csp_nonce()) ?>">
 (function(){
   var root=document.documentElement;root.classList.add('js');
   var form=document.getElementById('wizard'),steps=[].slice.call(form.querySelectorAll('.step')),bars=document.querySelectorAll('#steps i');

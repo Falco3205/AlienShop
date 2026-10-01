@@ -6,3 +6,4 @@
 <?= a_input('current_password', __('Password attuale (obbligatoria per confermare)'), '', 'password', ['required' => true, 'autocomplete' => 'current-password']) ?>
 <button class="btn" type="submit"><?= e(__('Salva')) ?></button>
 </div></form>
+<div class="card" style="max-width:560px"><h2><?= e(__('Sicurezza')) ?></h2><p><a class="btn sec" href="<?= e(url('admin/security')) ?>"><?= e(__('Verifica in due passaggi')) ?></a></p></div>

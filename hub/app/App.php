@@ -15,6 +15,7 @@ use Hub\Controllers\AuthController;
 use Hub\Controllers\DashboardController;
 use Hub\Controllers\JobsController;
 use Hub\Controllers\NodesController;
+use Hub\Controllers\SecurityController;
 use Hub\Controllers\SettingsController;
 use Hub\Controllers\ShopsController;
 
@@ -35,12 +36,7 @@ final class App
             }
             DB::boot();
             $req = Request::capture();
-            header('X-Content-Type-Options: nosniff');
-            header('X-Frame-Options: DENY');
-            header('Referrer-Policy: same-origin');
-            if (is_https()) {
-                header('Strict-Transport-Security: max-age=31536000');
-            }
+            \Alien\Core\Security::headers($req, true);
             $router = new Router();
             self::routes($router);
             $res = $router->dispatch($req) ?? new Response('Pagina non trovata', 404, ['Content-Type' => 'text/plain; charset=utf-8']);
@@ -71,9 +67,9 @@ final class App
                     if (!Auth::isAdmin()) {
                         return Response::redirect('login');
                     }
-                    if ($req->isPost() && !Csrf::valid($req)) {
+                    if ($req->isPost() && (!$req->sameOrigin() || !Csrf::valid($req))) {
                         flash('error', 'Sessione scaduta, riprova.');
-                        return Response::redirect($req->header('Referer') ?: '');
+                        return Response::redirect($req->backTo(''));
                     }
                 }
                 return (new $class())->$action($req, $params);
@@ -88,6 +84,7 @@ final class App
         };
 
         $both('/login', AuthController::class, 'login', true);
+        $both('/login/2fa', AuthController::class, 'twoFactor', true);
         $add('POST', '/logout', AuthController::class, 'logout');
         $add('GET', '/assets/{file}', AuthController::class, 'asset', true);
 
@@ -109,6 +106,10 @@ final class App
         $add('GET', '/jobs', JobsController::class, 'index');
         $add('GET', '/jobs/{id}', JobsController::class, 'show');
 
+        $add('GET', '/security', SecurityController::class, 'index');
+        foreach (['start', 'confirm', 'disable', 'recovery'] as $a) {
+            $add('POST', '/security/2fa/' . $a, SecurityController::class, $a);
+        }
         $both('/settings', SettingsController::class, 'index');
         $add('POST', '/settings/update', SettingsController::class, 'update');
 

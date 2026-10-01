@@ -12,7 +12,7 @@ final class Analytics
 
     public static function validId(string $id): bool
     {
-        return (bool)preg_match('/^G-[A-Z0-9]{6,14}$/', $id);
+        return (bool)preg_match('/^G-[A-Z0-9]{6,14}$/D', $id);
     }
 
     public static function id(): string

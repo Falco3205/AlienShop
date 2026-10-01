@@ -4,14 +4,17 @@ declare(strict_types=1);
 namespace Hub;
 
 use Alien\Core\DB;
+use Alien\Core\Secret;
 
 final class Jobs
 {
+    private const SECRET_KEYS = ['admin_password', 'hub_secret'];
+
     public const TYPES = ['install_shop' => 'Installa negozio', 'add_edge' => 'Pubblica sul frontend', 'suspend_shop' => 'Sospendi negozio', 'unsuspend_shop' => 'Riattiva negozio', 'node_update' => 'Aggiorna agente'];
 
     public static function queue(int $nodeId, string $type, array $payload, int $shopId = 0): int
     {
-        return DB::insert('jobs', ['node_id' => $nodeId, 'shop_id' => $shopId, 'type' => $type, 'payload' => json_encode($payload, JSON_UNESCAPED_UNICODE), 'status' => 'queued', 'created_at' => now()]);
+        return DB::insert('jobs', ['node_id' => $nodeId, 'shop_id' => $shopId, 'type' => $type, 'payload' => json_encode(self::seal($payload), JSON_UNESCAPED_UNICODE), 'status' => 'queued', 'created_at' => now()]);
     }
 
     public static function claimFor(int $nodeId): array
@@ -20,13 +23,33 @@ final class Jobs
         $out = [];
         foreach (DB::all("SELECT * FROM jobs WHERE node_id = ? AND status = 'queued' ORDER BY id LIMIT 5", [$nodeId]) as $j) {
             if (DB::exec("UPDATE jobs SET status = 'running', started_at = ? WHERE id = ? AND status = 'queued'", [now(), $j['id']]) === 1) {
-                $out[] = ['id' => (int)$j['id'], 'type' => $j['type'], 'payload' => json_decode((string)$j['payload'], true) ?: []];
+                $out[] = ['id' => (int)$j['id'], 'type' => $j['type'], 'payload' => self::open(json_decode((string)$j['payload'], true) ?: [])];
                 if ($j['shop_id'] && $j['type'] === 'install_shop') {
                     DB::update('shops', ['status' => 'installing'], 'id = ?', [$j['shop_id']]);
                 }
             }
         }
         return $out;
+    }
+
+    private static function seal(array $payload): array
+    {
+        foreach (self::SECRET_KEYS as $k) {
+            if (isset($payload[$k]) && $payload[$k] !== '') {
+                $payload[$k] = Secret::seal((string)$payload[$k]);
+            }
+        }
+        return $payload;
+    }
+
+    private static function open(array $payload): array
+    {
+        foreach (self::SECRET_KEYS as $k) {
+            if (isset($payload[$k]) && $payload[$k] !== '') {
+                $payload[$k] = Secret::open((string)$payload[$k]);
+            }
+        }
+        return $payload;
     }
 
     public static function startRunning(int $nodeId, int $shopId, string $type, array $payload): int
@@ -50,7 +73,13 @@ final class Jobs
         if (!$job || in_array($job['status'], ['ok', 'error'], true)) {
             return;
         }
-        DB::update('jobs', ['status' => $ok ? 'ok' : 'error', 'result' => json_encode($result, JSON_UNESCAPED_UNICODE), 'log' => mb_substr($log, 0, 20000), 'finished_at' => now()], 'id = ?', [$id]);
+        $payload = json_decode((string)$job['payload'], true) ?: [];
+        foreach (self::SECRET_KEYS as $k) {
+            if (isset($payload[$k])) {
+                $payload[$k] = '';
+            }
+        }
+        DB::update('jobs', ['status' => $ok ? 'ok' : 'error', 'payload' => json_encode($payload, JSON_UNESCAPED_UNICODE), 'result' => json_encode($result, JSON_UNESCAPED_UNICODE), 'log' => mb_substr($log, 0, 20000), 'finished_at' => now()], 'id = ?', [$id]);
         if ((int)$job['shop_id'] > 0) {
             Shops::onJobDone($job, $ok, $result, $log);
         }

@@ -57,7 +57,7 @@ final class Themes
         $rules = [];
         foreach ($vars as $setting => $var) {
             $v = (string)Settings::get($setting, '');
-            if (preg_match('/^#[0-9a-fA-F]{6}$/', $v)) {
+            if (preg_match('/^#[0-9a-fA-F]{6}$/D', $v)) {
                 $rules[] = $var . ':' . $v;
                 if ($var === '--primary') {
                     $rules[] = '--primary-contrast:' . self::contrast($v);

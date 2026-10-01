@@ -139,11 +139,30 @@ final class Request
 
     public function sameOrigin(): bool
     {
-        $host = parse_url(Config::baseUrl(), PHP_URL_HOST);
-        $origin = $this->header('Origin') ?: $this->header('Referer');
+        if (strtolower($this->header('Sec-Fetch-Site')) === 'cross-site') {
+            return false;
+        }
+        $origin = $this->header('Origin');
+        if ($origin === 'null') {
+            return false;
+        }
+        $origin = $origin ?: $this->header('Referer');
         if ($origin === '') {
             return true;
         }
-        return parse_url($origin, PHP_URL_HOST) === $host;
+        return self::sameHost($origin);
+    }
+
+    private static function sameHost(string $url): bool
+    {
+        $host = parse_url(Config::baseUrl(), PHP_URL_HOST);
+        $their = parse_url($url, PHP_URL_HOST);
+        return is_string($their) && is_string($host) && strtolower($their) === strtolower($host);
+    }
+
+    public function backTo(string $default): string
+    {
+        $ref = $this->header('Referer');
+        return $ref !== '' && self::sameHost($ref) && preg_match('#^https?://#i', $ref) ? $ref : $default;
     }
 }

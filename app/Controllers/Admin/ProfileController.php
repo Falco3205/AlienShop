@@ -20,7 +20,7 @@ final class ProfileController extends AdminController
             $error = match (true) {
                 !password_verify((string)($req->post['current_password'] ?? ''), $full['password']) => __('La password attuale non è corretta.'),
                 !filter_var($email, FILTER_VALIDATE_EMAIL) => __('Inserisci un indirizzo email valido.'),
-                $new !== '' && strlen($new) < 8 => __('La password deve avere almeno 8 caratteri.'),
+                $new !== '' && strlen($new) < 10 => __('La password deve avere almeno 10 caratteri.'),
                 (bool)DB::row('SELECT id FROM users WHERE email = ? AND id <> ?', [$email, $user['id']]) => __('Esiste già un account con questa email.'),
                 default => null,
             };

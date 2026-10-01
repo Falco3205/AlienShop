@@ -76,7 +76,7 @@ final class MollieGateway extends Gateway
             return true;
         }
         $id = (string)$order['payment_ref'];
-        if (!preg_match('/^tr_[A-Za-z0-9]+$/', $id)) {
+        if (!preg_match('/^tr_[A-Za-z0-9]+$/D', $id)) {
             return false;
         }
         return $this->settle($this->call('GET', '/payments/' . $id)['json'] ?? [], $order);
@@ -85,7 +85,7 @@ final class MollieGateway extends Gateway
     public function handleWebhook(Request $req): Response
     {
         $id = (string)($req->post['id'] ?? '');
-        if (!preg_match('/^tr_[A-Za-z0-9]+$/', $id)) {
+        if (!preg_match('/^tr_[A-Za-z0-9]+$/D', $id)) {
             return new Response('ok');
         }
         $payment = $this->call('GET', '/payments/' . $id)['json'] ?? [];

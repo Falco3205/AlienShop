@@ -15,7 +15,7 @@ final class ExpensesController extends AdminController
         if ($req->isPost()) {
             $net = Money::parse($req->str('net'));
             $vat = Money::parse($req->str('vat'));
-            $day = preg_match('/^\d{4}-\d{2}-\d{2}$/', $req->str('day')) ? $req->str('day') : date('Y-m-d');
+            $day = preg_match('/^\d{4}-\d{2}-\d{2}$/D', $req->str('day')) ? $req->str('day') : date('Y-m-d');
             if ($req->str('description') === '' || $net <= 0) {
                 return $this->back('admin/expenses', __('Descrizione e importo sono obbligatori.'), 'error');
             }

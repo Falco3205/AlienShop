@@ -28,7 +28,7 @@ final class Fiscal
 
     public static function vatValid(string $vat): bool
     {
-        if (!preg_match('/^\d{11}$/', $vat)) {
+        if (!preg_match('/^\d{11}$/D', $vat)) {
             return false;
         }
         $sum = 0;
@@ -48,10 +48,10 @@ final class Fiscal
     public static function cfValid(string $cf): bool
     {
         $cf = strtoupper(trim($cf));
-        if (preg_match('/^\d{11}$/', $cf)) {
+        if (preg_match('/^\d{11}$/D', $cf)) {
             return self::vatValid($cf);
         }
-        if (!preg_match('/^[A-Z]{6}\d{2}[A-EHLMPR-T]\d{2}[A-Z]\d{3}[A-Z]$/', $cf)) {
+        if (!preg_match('/^[A-Z]{6}\d{2}[A-EHLMPR-T]\d{2}[A-Z]\d{3}[A-Z]$/D', $cf)) {
             return false;
         }
         static $odd = [1, 0, 5, 7, 9, 13, 15, 17, 19, 21, 2, 4, 18, 20, 11, 3, 6, 8, 12, 14, 16, 10, 22, 25, 24, 23];
@@ -66,12 +66,12 @@ final class Fiscal
 
     public static function sdiCodeValid(string $code): bool
     {
-        return (bool)preg_match('/^[A-Z0-9]{7}$/', strtoupper($code));
+        return (bool)preg_match('/^[A-Z0-9]{7}$/D', strtoupper($code));
     }
 
     public static function provinceValid(string $p): bool
     {
-        return (bool)preg_match('/^[A-Z]{2}$/', strtoupper($p));
+        return (bool)preg_match('/^[A-Z]{2}$/D', strtoupper($p));
     }
 
     public static function paymentMode(string $method): string
@@ -102,7 +102,7 @@ final class Fiscal
             $cp = mb_ord($ch);
             if (($cp >= 0x20 && $cp <= 0x7E) || ($cp >= 0xA0 && $cp <= 0xFF)) {
                 $out .= $ch;
-            } elseif ($trans && ($t = $trans->transliterate($ch)) !== false && preg_match('/^[\x20-\x7E]+$/', $t)) {
+            } elseif ($trans && ($t = $trans->transliterate($ch)) !== false && preg_match('/^[\x20-\x7E]+$/D', $t)) {
                 $out .= $t;
             } else {
                 $out .= '?';

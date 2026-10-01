@@ -2,6 +2,21 @@
   'use strict';
   var $$ = function (s, c) { return Array.prototype.slice.call((c || document).querySelectorAll(s)); };
 
+  $$('[data-toggle-side]').forEach(function (b) {
+    b.addEventListener('click', function () { var s = document.getElementById('side'); if (s) s.classList.toggle('open'); });
+  });
+  $$('[data-confirm-click]').forEach(function (b) {
+    b.addEventListener('click', function (e) { if (!window.confirm(b.dataset.confirmClick)) e.preventDefault(); });
+  });
+  $$('[data-stop]').forEach(function (b) {
+    b.addEventListener('click', function (e) { e.stopPropagation(); });
+  });
+  $$('form[data-busy]').forEach(function (f) {
+    f.addEventListener('submit', function () {
+      var b = f.querySelector('button');
+      if (b) { b.disabled = true; b.textContent = f.dataset.busy; }
+    });
+  });
   $$('form[data-confirm]').forEach(function (f) {
     f.addEventListener('submit', function (e) { if (!window.confirm(f.dataset.confirm)) e.preventDefault(); });
   });

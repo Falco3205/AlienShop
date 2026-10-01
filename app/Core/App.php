@@ -34,12 +34,12 @@ final class App
         });
 
         try {
+            $req = Request::capture();
+            self::securityHeaders($req);
             if (!Config::installed()) {
-                self::send((new InstallController())->handle(Request::capture()));
+                self::send((new InstallController())->handle($req));
                 return;
             }
-            $req = Request::capture();
-            self::securityHeaders();
 
             if ($redirect = self::canonicalRedirect($req)) {
                 self::send($redirect);
@@ -205,16 +205,9 @@ final class App
         return null;
     }
 
-    private static function securityHeaders(): void
+    private static function securityHeaders(Request $req): void
     {
-        header('X-Content-Type-Options: nosniff');
-        header('X-Frame-Options: SAMEORIGIN');
-        header('Referrer-Policy: strict-origin-when-cross-origin');
-        header('Permissions-Policy: camera=(), microphone=(), geolocation=()');
-        if (is_https()) {
-            header('Strict-Transport-Security: max-age=31536000');
-        }
-        header_remove('X-Powered-By');
+        Security::headers($req);
     }
 
     private static function sendCached(array $hit, Request $req): void

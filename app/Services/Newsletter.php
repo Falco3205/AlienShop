@@ -72,7 +72,7 @@ final class Newsletter
         fwrite($fh, "\xEF\xBB\xBF");
         fputcsv($fh, ['email', 'name', 'status', 'source', 'created_at'], ',', '"', '\\');
         foreach (DB::all('SELECT email, name, status, source, created_at FROM subscribers ORDER BY id') as $r) {
-            fputcsv($fh, $r, ',', '"', '\\');
+            fputcsv($fh, \Alien\Core\Str::csvRow($r), ',', '"', '\\');
         }
         rewind($fh);
         return (string)stream_get_contents($fh);

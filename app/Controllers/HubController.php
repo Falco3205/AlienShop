@@ -6,6 +6,7 @@ namespace Alien\Controllers;
 use Alien\Core\Auth;
 use Alien\Core\DB;
 use Alien\Core\HubSign;
+use Alien\Core\RateLimit;
 use Alien\Core\Request;
 use Alien\Core\Response;
 use Alien\Services\HubAgent;
@@ -15,7 +16,12 @@ final class HubController extends Controller
 {
     private function authorize(Request $req): ?Response
     {
-        if (!HubAgent::configured() || !HubSign::verify(HubAgent::secret(), $req->method, $req->path, $req->body(), $req->header('X-Alien-Time'), $req->header('X-Alien-Signature'))) {
+        if (RateLimit::blocked('hubauth', 30, 600)) {
+            return $this->json(['error' => 'rate_limited'], 429);
+        }
+        $valid = HubAgent::configured() && HubSign::verify(HubAgent::secret(), $req->method, $req->path, $req->body(), $req->header('X-Alien-Time'), $req->header('X-Alien-Signature'), $req->header('X-Alien-Nonce'));
+        if (!$valid || !HubAgent::fresh($req->header('X-Alien-Nonce'))) {
+            RateLimit::hit('hubauth', 1000, 600);
             return $this->json(['error' => 'unauthorized'], 403);
         }
         return null;
@@ -61,7 +67,8 @@ final class HubController extends Controller
 
     public function login(Request $req): Response
     {
-        if (!HubAgent::consumeSso($req->str('t'))) {
+        if (RateLimit::blocked('hubsso', 10, 600) || !HubAgent::consumeSso($req->str('t'))) {
+            RateLimit::hit('hubsso', 1000, 600);
             return $this->missing($req);
         }
         $admin = DB::row("SELECT id, email, name, phone, role FROM users WHERE role = 'admin' ORDER BY id LIMIT 1");

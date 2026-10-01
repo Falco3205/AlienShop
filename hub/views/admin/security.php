@@ -1,0 +1,30 @@
+<div class="grid2"><div>
+<div class="card"><h2>Verifica in due passaggi <?= $enabled ? '<span class="pill ok">' . e('Attiva') . '</span>' : '<span class="pill warn">' . e('Non attiva') . '</span>' ?></h2>
+<?php if ($codes): ?>
+  <div class="alert info"><strong>Codici di recupero</strong><br>Conservali in un posto sicuro: ognuno vale una sola volta e non verranno più mostrati.
+  <pre style="font-size:1.05rem;line-height:1.7;margin:10px 0 0"><?= e(implode("\n", $codes)) ?></pre></div>
+<?php endif ?>
+<?php if (!$enabled && !$pending): ?>
+  <p>Oltre alla password serve un codice a 6 cifre generato da un'app (Google Authenticator, Authy, 1Password…). Chi scopre la tua password non può entrare.</p>
+  <form method="post" action="<?= e(url('security/2fa/start')) ?>"><?= csrf_field() ?>
+  <?= a_input('password', 'La tua password', '', 'password', ['required' => true, 'autocomplete' => 'current-password']) ?>
+  <button class="btn" type="submit">Attiva</button></form>
+<?php elseif (!$enabled && $pending): ?>
+  <p>1. Nell'app scegli "Aggiungi account" e inserisci questa chiave a mano (oppure apri il link dal telefono):</p>
+  <p><code style="font-size:1.1rem;letter-spacing:2px"><?= e(implode(' ', str_split($pending, 4))) ?></code></p>
+  <p class="muted" style="word-break:break-all"><a href="<?= e($uri) ?>">Apri nell'app di autenticazione</a></p>
+  <p>2. Inserisci il codice che l'app ti mostra per confermare:</p>
+  <form method="post" action="<?= e(url('security/2fa/confirm')) ?>"><?= csrf_field() ?>
+  <?= a_input('code', 'Codice a 6 cifre', '', 'text', ['required' => true, 'inputmode' => 'numeric', 'maxlength' => 8, 'autocomplete' => 'one-time-code']) ?>
+  <button class="btn" type="submit">Conferma e attiva</button></form>
+<?php else: ?>
+  <p>L'accesso richiede la password e il codice dell'app.</p>
+  <form method="post" action="<?= e(url('security/2fa/recovery')) ?>" style="margin-bottom:18px"><?= csrf_field() ?>
+  <?= a_input('password', 'La tua password', '', 'password', ['required' => true, 'autocomplete' => 'current-password']) ?>
+  <button class="btn sec" type="submit">Genera nuovi codici di recupero</button></form>
+  <form method="post" action="<?= e(url('security/2fa/disable')) ?>"><?= csrf_field() ?>
+  <?= a_input('password', 'La tua password', '', 'password', ['required' => true, 'autocomplete' => 'current-password']) ?>
+  <?= a_input('code', 'Codice a 6 cifre', '', 'text', ['required' => true, 'inputmode' => 'numeric', 'maxlength' => 12]) ?>
+  <button class="btn sec" type="submit">Disattiva</button></form>
+<?php endif ?></div></div>
+<div class="card"><h2>Se perdi il telefono</h2><p>Usa un codice di recupero al posto del codice a 6 cifre. Se non li hai più, da terminale sul server:</p><pre>php hub/bin/hub user:2fa-off email@dominio.it</pre></div></div>

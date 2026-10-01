@@ -781,17 +781,23 @@ t('aggiornamento: controllo versione da GitHub, webhook firmato', function () {
     eq(Alien\Services\Updater::verifySignature($body, $sig, ''), false);
 });
 out("Hub e proxy\n");
-t('HubSign: firma, finestra temporale, manomissione', function () {
+t('HubSign: firma, nonce, finestra temporale, manomissione', function () {
     $h = Alien\Core\HubSign::headers('segreto', 'POST', '/hub/update', '{"a":1}');
-    $ts = (int)substr($h[0], 13);
-    $sig = substr($h[1], 19);
-    eq(Alien\Core\HubSign::verify('segreto', 'POST', '/hub/update', '{"a":1}', (string)$ts, $sig), true);
-    eq(Alien\Core\HubSign::verify('segreto', 'POST', '/hub/update', '{"a":2}', (string)$ts, $sig), false);
-    eq(Alien\Core\HubSign::verify('segreto', 'GET', '/hub/update', '{"a":1}', (string)$ts, $sig), false);
-    eq(Alien\Core\HubSign::verify('altro', 'POST', '/hub/update', '{"a":1}', (string)$ts, $sig), false);
-    $old = $ts - 1000;
-    eq(Alien\Core\HubSign::verify('segreto', 'POST', '/hub/update', '{"a":1}', (string)$old, Alien\Core\HubSign::signature('segreto', 'POST', '/hub/update', '{"a":1}', $old)), false, 'firma scaduta');
-    eq(Alien\Core\HubSign::verify('', 'POST', '/x', '', (string)$ts, Alien\Core\HubSign::signature('', 'POST', '/x', '', $ts)), false, 'segreto vuoto');
+    $ts = substr($h[0], 14);
+    $nonce = substr($h[1], 15);
+    $sig = substr($h[2], 19);
+    $v = fn(string $secret, string $m, string $path, string $body, string $t, string $s, string $n) => Alien\Core\HubSign::verify($secret, $m, $path, $body, $t, $s, $n);
+    eq($v('segreto', 'POST', '/hub/update', '{"a":1}', $ts, $sig, $nonce), true);
+    eq($v('segreto', 'POST', '/hub/update', '{"a":2}', $ts, $sig, $nonce), false);
+    eq($v('segreto', 'GET', '/hub/update', '{"a":1}', $ts, $sig, $nonce), false);
+    eq($v('altro', 'POST', '/hub/update', '{"a":1}', $ts, $sig, $nonce), false);
+    eq($v('segreto', 'POST', '/hub/update', '{"a":1}', $ts, $sig, bin2hex(random_bytes(12))), false, 'nonce diverso');
+    eq($v('segreto', 'POST', '/hub/update', '{"a":1}', $ts, $sig, ''), false, 'nonce mancante');
+    $old = (int)$ts - 1000;
+    eq($v('segreto', 'POST', '/hub/update', '{"a":1}', (string)$old, Alien\Core\HubSign::signature('segreto', 'POST', '/hub/update', '{"a":1}', $old, $nonce), $nonce), false, 'firma scaduta');
+    eq($v('', 'POST', '/x', '', $ts, Alien\Core\HubSign::signature('', 'POST', '/x', '', (int)$ts, $nonce), $nonce), false, 'segreto vuoto');
+    $h2 = Alien\Core\HubSign::headers('segreto', 'GET', '/hub/stats');
+    eq($h2[2] !== Alien\Core\HubSign::headers('segreto', 'GET', '/hub/stats')[2], true, 'due richieste identiche nello stesso secondo hanno firme diverse');
 });
 t('proxy fidati: IP reale da X-Forwarded-For solo da proxy autorizzati', function () {
     $mk = fn(string $remote, string $xff) => new Request('GET', '/', [], [], [], ['REMOTE_ADDR' => $remote, 'HTTP_X_FORWARDED_FOR' => $xff]);
@@ -823,6 +829,143 @@ t('HubAgent: metriche, SSO monouso e a scadenza', function () {
     Alien\Services\HubAgent::connect('https://hub.test/alienshop', 'segreto-lungo');
     eq(Alien\Services\HubAgent::secret(), 'segreto-lungo');
     eq(Alien\Services\HubAgent::configured(), true);
+});
+out("Sicurezza\n");
+t('2FA: TOTP (vettori RFC 6238), conferma, codice monouso, recupero, disattivazione', function () {
+    eq(Alien\Core\Totp::code('GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ', intdiv(59, 30)), '287082');
+    eq(Alien\Core\Totp::code('GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ', intdiv(1111111109, 30)), '081804');
+    $uid = Alien\Core\Auth::create('totp@test.dev', 'password-lunga-1', 'T', 'admin');
+    eq(Alien\Core\TwoFactor::enabled($uid), false);
+    $secret = Alien\Core\TwoFactor::begin($uid);
+    eq(Alien\Core\TwoFactor::confirm($uid, '000000'), null, 'codice errato');
+    $codes = Alien\Core\TwoFactor::confirm($uid, Alien\Core\Totp::code($secret, intdiv(time(), 30)));
+    eq(count($codes), 8);
+    eq(Alien\Core\TwoFactor::enabled($uid), true);
+    eq(str_contains((string)Settings::get('totp_secret_' . $uid), $secret), false, 'segreto cifrato a riposo');
+    eq(Alien\Core\TwoFactor::check($uid, Alien\Core\Totp::code($secret, intdiv(time(), 30))), false, 'lo stesso codice non vale due volte');
+    Settings::set('totp_last_' . $uid, '0');
+    eq(Alien\Core\TwoFactor::check($uid, Alien\Core\Totp::code($secret, intdiv(time(), 30))), true);
+    eq(Alien\Core\TwoFactor::check($uid, 'abc'), false);
+    eq(Alien\Core\TwoFactor::check($uid, $codes[0]), true, 'codice di recupero');
+    eq(Alien\Core\TwoFactor::check($uid, $codes[0]), false, 'il codice di recupero è monouso');
+    Alien\Core\TwoFactor::disable($uid);
+    eq(Alien\Core\TwoFactor::enabled($uid), false);
+});
+t('login: blocco per account oltre che per IP', function () {
+    DB::delete('login_attempts', '1 = 1');
+    Alien\Core\Auth::create('vittima@test.dev', 'password-giusta-1', 'V', 'customer');
+    $key = 'u:' . substr(hash('sha256', 'vittima@test.dev'), 0, 24);
+    for ($i = 0; $i < 10; $i++) {
+        Alien\Core\RateLimit::hitKey($key, 100, 900);
+    }
+    eq(Alien\Core\Auth::attempt('vittima@test.dev', 'password-giusta-1'), null, 'account bloccato anche con la password giusta');
+    eq(Alien\Core\Auth::attempt('altro@test.dev', 'x'), null);
+    DB::delete('login_attempts', '1 = 1');
+    eq(Alien\Core\Auth::attempt('vittima@test.dev', 'password-giusta-1')['email'], 'vittima@test.dev');
+    for ($i = 0; $i < 8; $i++) {
+        Alien\Core\Auth::attempt('vittima@test.dev', 'no' . $i);
+    }
+    eq(Alien\Core\Auth::attempt('vittima@test.dev', 'password-giusta-1'), null, 'blocco per IP dopo 8 errori');
+    DB::delete('login_attempts', '1 = 1');
+});
+t('CSP: rigida per admin con nonce, standard per il negozio, domini extra validati', function () {
+    $admin = Alien\Core\Security::csp(new Request('GET', '/admin/orders', [], [], [], []));
+    eq(str_contains($admin, "script-src 'self' 'nonce-" . csp_nonce() . "'"), true);
+    eq(str_contains($admin, 'unsafe-inline\'; style') || str_contains($admin, "script-src 'self' 'unsafe-inline'"), false);
+    eq(str_contains($admin, "object-src 'none'") && str_contains($admin, "frame-ancestors 'self'") && str_contains($admin, "form-action 'self'"), true);
+    $shop = Alien\Core\Security::csp(new Request('GET', '/', [], [], [], []));
+    eq(str_contains($shop, 'googletagmanager.com') && str_contains($shop, "base-uri 'self'") && str_contains($shop, "object-src 'none'"), true);
+    $hub = Alien\Core\Security::csp(new Request('GET', '/', [], [], [], []), true);
+    eq(str_contains($hub, "frame-ancestors 'none'") && str_contains($hub, "'nonce-"), true);
+    foreach (['https://ok.example.com', 'https://*.example.com:8443'] as $good) {
+        eq(Alien\Core\Security::validSource($good), true, $good);
+    }
+    foreach (['http://x.com', 'https://x.com; script-src *', "https://x.com\n", 'https://', '*', "https://x.com/path"] as $bad) {
+        eq(Alien\Core\Security::validSource($bad), false, $bad);
+    }
+});
+t('CSRF: richieste cross-site, Origin null e Referer esterni rifiutati; redirect solo interni', function () {
+    $mk = fn(array $h) => new Request('POST', '/cart/add', [], [], [], $h);
+    eq($mk(['HTTP_SEC_FETCH_SITE' => 'cross-site'])->sameOrigin(), false);
+    eq($mk(['HTTP_ORIGIN' => 'null'])->sameOrigin(), false);
+    eq($mk(['HTTP_ORIGIN' => 'https://evil.test'])->sameOrigin(), false);
+    eq($mk(['HTTP_REFERER' => 'https://evil.test/x'])->sameOrigin(), false);
+    eq($mk(['HTTP_ORIGIN' => 'http://shop.test', 'HTTP_SEC_FETCH_SITE' => 'same-origin'])->sameOrigin(), true);
+    eq($mk([])->sameOrigin(), true);
+    eq($mk(['HTTP_REFERER' => 'https://evil.test/phish'])->backTo('cart'), 'cart', 'niente open redirect');
+    eq($mk(['HTTP_REFERER' => 'http://shop.test/products/x'])->backTo('cart'), 'http://shop.test/products/x');
+    eq($mk(['HTTP_REFERER' => 'javascript:alert(1)'])->backTo('cart'), 'cart');
+});
+t('esportazioni CSV: nessuna formula eseguibile da Excel', function () {
+    eq(Str::csvCell('=HYPERLINK("http://evil")'), "'=HYPERLINK(\"http://evil\")");
+    eq(Str::csvCell('+39 333'), "'+39 333");
+    eq(Str::csvCell('@SUM(A1)'), "'@SUM(A1)");
+    eq(Str::csvCell('-2,00 €'), "'-2,00 €");
+    eq(Str::csvCell('-12.5'), '-12.5', 'i numeri restano numeri');
+    eq(Str::csvCell('Mario Rossi'), 'Mario Rossi');
+});
+t('immagini: bomba di decompressione e file non immagine rifiutati', function () {
+    $ihdr = pack('NNCCCCC', 20000, 20000, 8, 2, 0, 0, 0);
+    $png = "\x89PNG\r\n\x1a\n" . pack('N', 13) . 'IHDR' . $ihdr . pack('N', crc32('IHDR' . $ihdr)) . pack('N', 0) . 'IEND' . pack('N', crc32('IEND'));
+    eq(Alien\Core\ImageProcessor::fromBinary($png), null);
+    eq(Alien\Core\ImageProcessor::fromBinary('<?php echo 1; ?>'), null);
+    eq(Alien\Core\ImageProcessor::fromBinary('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>'), null);
+});
+t('fatture fornitore: DOCTYPE/ENTITY rifiutati (XXE)', function () {
+    $evil = '<?xml version="1.0"?><!DOCTYPE x [<!ENTITY e SYSTEM "file:///etc/passwd">]><p:FatturaElettronica xmlns:p="http://ivaservizi.agenziaentrate.gov.it/docs/xsd/fatture/v1.2"><a>&e;</a></p:FatturaElettronica>';
+    $threw = false;
+    try {
+        Alien\EInvoice\XmlParser::parse($evil);
+    } catch (RuntimeException) {
+        $threw = true;
+    }
+    eq($threw, true);
+});
+t('email: indirizzi con ritorni a capo o non validi rifiutati', function () {
+    eq(Alien\Core\Mailer::send("a@b.it\r\nBcc: x@y.it", 'Oggetto', '<p>x</p>'), false);
+    eq(Alien\Core\Mailer::send('non-una-email', 'Oggetto', '<p>x</p>'), false);
+    eq(Alien\Core\Mailer::send('ok@test.dev', 'Oggetto', '<p>x</p>', [], "x@y.it\r\nBcc: z"), false, 'Reply-To con iniezione');
+    eq(Alien\Core\Mailer::send('ok@test.dev', 'Oggetto', '<p>x</p>'), true);
+});
+t('lingua: nome file non valido ricondotto a un valore sicuro', function () {
+    Alien\Core\Lang::load('../../app/bootstrap');
+    eq(Alien\Core\Lang::locale(), 'it');
+    Alien\Core\Lang::load('it');
+});
+t('rate limit: tentativi su coupon bloccati dopo la soglia', function () {
+    DB::delete('login_attempts', '1 = 1');
+    for ($i = 0; $i < 15; $i++) {
+        eq(Alien\Core\RateLimit::hit('coupon', 15, 900), true);
+    }
+    eq(Alien\Core\RateLimit::hit('coupon', 15, 900), false);
+    eq(Alien\Core\RateLimit::hitKey('coupon:203.0.113.77', 15, 900), true, 'un altro IP non è bloccato');
+    DB::delete('login_attempts', '1 = 1');
+});
+t('Hub: replay delle richieste firmate e SSO non azzerabile da tentativi sbagliati', function () {
+    $sig = bin2hex(random_bytes(16));
+    eq(Alien\Services\HubAgent::fresh($sig), true);
+    eq(Alien\Services\HubAgent::fresh($sig), false, 'stessa firma riusata');
+    $t = Alien\Services\HubAgent::createSso();
+    eq(Alien\Services\HubAgent::consumeSso('sbagliato'), false);
+    eq(Alien\Services\HubAgent::consumeSso($t), true, 'un tentativo errato non invalida il token legittimo');
+});
+t('aggiornamento ZIP: pacchetto di un\'altra versione rifiutato', function () use ($tmp) {
+    $site = $tmp . '/zip-site2';
+    mkdir("$site/app", 0777, true);
+    mkdir("$site/storage", 0777, true);
+    $z = new ZipArchive();
+    $zp = $tmp . '/wrong.zip';
+    $z->open($zp, ZipArchive::CREATE | ZipArchive::OVERWRITE);
+    $z->addFromString('owner-repo-aaaaaaa/app/bootstrap.php', 'x');
+    $z->addFromString('owner-repo-aaaaaaa/public/index.php', 'x');
+    $z->close();
+    $threw = false;
+    try {
+        Alien\Services\Updater::applyZip($zp, $site, 'b' . str_repeat('0', 39), 'bbbbbbb');
+    } catch (RuntimeException) {
+        $threw = true;
+    }
+    eq($threw, true);
 });
 out("Fatturazione elettronica\n");
 use Alien\EInvoice\Fiscal;

@@ -77,6 +77,14 @@ t('negozio: validazione di dominio, cartella, duplicati', function () use ($back
         [$id, $errors] = Shops::create($bad + $base + ['domain' => 'ok.it']);
         eq($id, null, json_encode($bad));
     }
+    foreach (["ok.it\nBcc: x", 'ok.it/../x', "ok.it\0.evil.com"] as $dom) {
+        [$id] = Shops::create(['domain' => $dom] + $base);
+        eq($id, null, json_encode($dom));
+    }
+    [$id] = Shops::create(['domain' => 'ok.it', 'path' => "neg\n"] + $base);
+    eq($id, null, 'cartella con ritorno a capo');
+    [$id, , $errs] = Nodes::create('Srv', 'backend', '', "http://10.0.0.2\nlocation / {}", 'falco3205');
+    eq($id, null, 'upstream con ritorno a capo');
     [$id, $errors] = Shops::create($base + ['domain' => 'edge-needs.it', 'mode' => 'edge', 'edge_node_id' => $backId]);
     eq($id, null, 'il frontend deve avere ruolo edge');
 });
@@ -95,9 +103,13 @@ t('negozio diretto: job di installazione con parametri corretti', function () us
     eq(strlen($p['admin_password']) >= 16, true);
     eq(Shops::find($shopId)['status'], 'installing');
     eq(str_contains((string)DB::val('SELECT secret FROM shops WHERE id = ?', [$shopId]), $p['hub_secret']), false, 'secret cifrato a riposo');
+    $stored = (string)DB::val('SELECT payload FROM jobs WHERE id = ?', [$jobs[0]['id']]);
+    eq(str_contains($stored, $p['hub_secret']) || str_contains($stored, $p['admin_password']), false, 'segreti del lavoro cifrati a riposo');
     eq(Jobs::claimFor($backId), [], 'un job viene consegnato una volta sola');
     Jobs::complete($jobs[0]['id'], true, [], 'fatto');
     eq(Shops::find($shopId)['status'], 'active');
+    $after = json_decode((string)DB::val('SELECT payload FROM jobs WHERE id = ?', [$jobs[0]['id']]), true);
+    eq([$after['hub_secret'], $after['admin_password']], ['', ''], 'segreti rimossi a lavoro concluso');
     Jobs::complete($jobs[0]['id'], false, [], 'doppio');
     eq(DB::val('SELECT status FROM jobs WHERE id = ?', [$jobs[0]['id']]), 'ok', 'risultato definitivo');
 });
@@ -108,6 +120,13 @@ t('negozio dietro frontend: installazione poi pubblicazione, URL in sottocartell
     $jobs = Jobs::claimFor($backId);
     $p = $jobs[0]['payload'];
     eq([$p['url'], $p['mode'], $p['trusted_proxies']], ['https://bianchi.it/negozio', 'edge', ['203.0.113.1']]);
+    DB::update('nodes', ['trusted' => '10.0.0.0/24, 172.16.0.5'], 'id = ?', [$backId]);
+    [$id2] = Shops::create(['name' => 'Neri', 'domain' => 'neri.it', 'admin_email' => 'n@neri.it', 'node_id' => $backId, 'mode' => 'edge', 'edge_node_id' => $edgeId]);
+    $j2 = Jobs::claimFor($backId);
+    eq($j2[0]['payload']['trusted_proxies'], ['10.0.0.0/24', '172.16.0.5'], 'intervallo del tunnel al posto dell\'IP pubblico');
+    DB::update('nodes', ['trusted' => ''], 'id = ?', [$backId]);
+    [$nid, , $nerr] = Nodes::create('X', 'backend', '', 'http://10.0.0.2', 'falco3205', '1.2.3.4; id');
+    eq($nid, null, 'intervallo non valido');
     Jobs::complete($jobs[0]['id'], true, [], 'ok');
     eq(Shops::find($id)['status'], 'installing', 'finché il frontend non è pronto');
     $edgeJobs = Jobs::claimFor($edgeId);

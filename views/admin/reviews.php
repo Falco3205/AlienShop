@@ -8,7 +8,7 @@
   <form method="post" action="<?= e(url('admin/reviews/' . $r['id'])) ?>" style="display:flex;gap:6px"><?= csrf_field() ?><input type="hidden" name="back" value="<?= e($status) ?>">
     <?php if ($status !== 'approved'): ?><button class="btn sm" name="action" value="approve">✓ <?= e(__('Approva')) ?></button><?php endif ?>
     <?php if ($status !== 'rejected'): ?><button class="btn sec sm" name="action" value="reject"><?= e(__('Rifiuta')) ?></button><?php endif ?>
-    <button class="btn danger sm" name="action" value="delete" onclick="return confirm('<?= e(__('Eliminare la recensione?')) ?>')">✕</button></form></div><?php endforeach ?>
+    <button class="btn danger sm" name="action" value="delete" data-confirm-click="<?= e(__('Eliminare la recensione?')) ?>">✕</button></form></div><?php endforeach ?>
 </div><div><div class="card"><h2><?= e(__('Impostazioni')) ?></h2><form method="post" action="<?= e(url('admin/reviews/settings')) ?>"><?= csrf_field() ?>
   <?= a_check('reviews_auto', __('Pubblica subito senza moderazione'), setting('reviews_auto', '0') === '1') ?>
   <?= a_input('reviews_request_days', __('Chiedi una recensione dopo (giorni dalla spedizione)'), setting('reviews_request_days', 7), 'number', ['min' => 1, 'max' => 60]) ?>

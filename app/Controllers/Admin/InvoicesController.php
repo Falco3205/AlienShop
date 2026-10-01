@@ -52,8 +52,8 @@ final class InvoicesController extends AdminController
 
     public function export(Request $req): Response
     {
-        $from = preg_match('/^\d{4}-\d{2}-\d{2}$/', $req->str('from')) ? $req->str('from') : date('Y-m-01');
-        $to = preg_match('/^\d{4}-\d{2}-\d{2}$/', $req->str('to')) ? $req->str('to') : date('Y-m-d');
+        $from = preg_match('/^\d{4}-\d{2}-\d{2}$/D', $req->str('from')) ? $req->str('from') : date('Y-m-01');
+        $to = preg_match('/^\d{4}-\d{2}-\d{2}$/D', $req->str('to')) ? $req->str('to') : date('Y-m-d');
         return Response::download(Invoices::csv($from, $to), "fatture-$from-$to.csv");
     }
 }

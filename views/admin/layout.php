@@ -77,7 +77,7 @@ if ($extra) {
     <form method="post" action="<?= e(url('admin/logout')) ?>"><?= csrf_field() ?><button type="submit"><?= e(__('Esci')) ?></button></form></div>
 </aside>
 <div class="main">
-  <header class="top"><button class="burger" type="button" onclick="document.getElementById('side').classList.toggle('open')" aria-label="menu">☰</button>
+  <header class="top"><button class="burger" type="button" data-toggle-side aria-label="menu">☰</button>
     <div class="top-title"><h1><?= e($title ?? '') ?></h1><?php if (!empty($subtitle)): ?><p><?= e($subtitle) ?></p><?php endif ?></div>
     <form class="gsearch" method="get" action="<?= e(url('admin/search')) ?>" role="search"><input type="search" name="q" placeholder="<?= e(__('Cerca prodotti, ordini, clienti…')) ?>" aria-label="<?= e(__('Cerca')) ?>"></form>
     <div class="top-actions"><?= $actions ?? '' ?></div></header>

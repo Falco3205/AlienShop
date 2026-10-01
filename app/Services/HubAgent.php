@@ -71,6 +71,27 @@ final class HubAgent
         ];
     }
 
+    public static function fresh(string $signature): bool
+    {
+        $dir = ROOT . '/storage/hub-nonces';
+        if (!is_dir($dir) && !@mkdir($dir, 0750, true)) {
+            return true;
+        }
+        $file = $dir . '/' . hash('sha256', $signature);
+        if (is_file($file)) {
+            return false;
+        }
+        @touch($file);
+        if (random_int(1, 20) === 1) {
+            foreach (glob($dir . '/*') ?: [] as $f) {
+                if (filemtime($f) < time() - 900) {
+                    @unlink($f);
+                }
+            }
+        }
+        return true;
+    }
+
     public static function createSso(): string
     {
         $token = bin2hex(random_bytes(24));
@@ -81,7 +102,17 @@ final class HubAgent
     public static function consumeSso(string $token): bool
     {
         $s = json_decode((string)Settings::get('hub_sso', ''), true);
+        if (!is_array($s) || $token === '') {
+            return false;
+        }
+        if ($s['exp'] < time()) {
+            Settings::set('hub_sso', '');
+            return false;
+        }
+        if (!hash_equals((string)$s['hash'], hash('sha256', $token))) {
+            return false;
+        }
         Settings::set('hub_sso', '');
-        return $token !== '' && is_array($s) && $s['exp'] >= time() && hash_equals((string)$s['hash'], hash('sha256', $token));
+        return true;
     }
 }

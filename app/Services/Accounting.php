@@ -11,14 +11,14 @@ final class Accounting
     public static function period(string $type, string $value): array
     {
         $year = (int)date('Y');
-        if ($type === 'year' && preg_match('/^\d{4}$/', $value)) {
+        if ($type === 'year' && preg_match('/^\d{4}$/D', $value)) {
             return [$value . '-01-01', $value . '-12-31', $value];
         }
-        if ($type === 'quarter' && preg_match('/^(\d{4})-Q([1-4])$/', $value, $m)) {
+        if ($type === 'quarter' && preg_match('/^(\d{4})-Q([1-4])$/D', $value, $m)) {
             $startMonth = ((int)$m[2] - 1) * 3 + 1;
             return [sprintf('%s-%02d-01', $m[1], $startMonth), date('Y-m-t', strtotime(sprintf('%s-%02d-01', $m[1], $startMonth + 2))), $m[1] . ' T' . $m[2]];
         }
-        if (!preg_match('/^\d{4}-\d{2}$/', $value)) {
+        if (!preg_match('/^\d{4}-\d{2}$/D', $value)) {
             $value = date('Y-m');
         }
         return [$value . '-01', date('Y-m-t', strtotime($value . '-01')), date('m/Y', strtotime($value . '-01'))];
@@ -183,12 +183,12 @@ final class Accounting
         } elseif ($kind === 'acquisti') {
             fputcsv($fh, ['data', 'tipo', 'numero', 'fornitore', 'partita_iva', 'categoria', 'imponibile', 'iva', 'iva_detraibile', 'totale', 'pagata_il'], ',', '"', '\\');
             foreach (self::purchases($from, $to) as $r) {
-                fputcsv($fh, [$r['date'], $r['type'], $r['number'], $r['party'], $r['vat_id'], $r['category'], $dec($r['net']), $dec($r['vat']), $dec($r['vat_deductible']), $dec($r['total']), (string)$r['paid_at']], ',', '"', '\\');
+                fputcsv($fh, \Alien\Core\Str::csvRow([$r['date'], $r['type'], $r['number'], $r['party'], $r['vat_id'], $r['category'], $dec($r['net']), $dec($r['vat']), $dec($r['vat_deductible']), $dec($r['total']), (string)$r['paid_at']]), ',', '"', '\\');
             }
         } else {
             fputcsv($fh, ['data', 'tipo', 'numero', 'cliente', 'partita_iva_cf', 'aliquota', 'imponibile', 'iva', 'totale'], ',', '"', '\\');
             foreach (self::sales($from, $to) as $r) {
-                fputcsv($fh, [$r['date'], $r['type'], $r['number'], $r['party'], $r['vat_id'], $r['rate'], $dec($r['net']), $dec($r['vat']), $dec($r['total'])], ',', '"', '\\');
+                fputcsv($fh, \Alien\Core\Str::csvRow([$r['date'], $r['type'], $r['number'], $r['party'], $r['vat_id'], $r['rate'], $dec($r['net']), $dec($r['vat']), $dec($r['total'])]), ',', '"', '\\');
             }
         }
         rewind($fh);

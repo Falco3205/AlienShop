@@ -47,7 +47,7 @@ $next = static fn(int $from) => '<input type="hidden" name="action" value="save"
   <p class="muted"><?= e(__('Scegli quali pagine creare. Le pagine già esistenti verranno sostituite con il nuovo testo.')) ?></p>
   <?php foreach ($preview as $slug => $pg): ?>
     <details style="border:1px solid var(--border);border-radius:10px;padding:10px 14px;margin-bottom:8px"><summary style="cursor:pointer;display:flex;gap:10px;align-items:center;list-style:none">
-      <input type="checkbox" name="pages[]" value="<?= e($slug) ?>" checked onclick="event.stopPropagation()"> <strong><?= e($pg['title']) ?></strong>
+      <input type="checkbox" name="pages[]" value="<?= e($slug) ?>" checked data-stop> <strong><?= e($pg['title']) ?></strong>
       <?php if (in_array($slug, $existing, true)): ?><span class="pill warn"><?= e(__('sostituisce la pagina esistente')) ?></span><?php else: ?><span class="pill ok"><?= e(__('nuova')) ?></span><?php endif ?></summary>
       <div style="margin-top:10px;max-height:360px;overflow:auto;font-size:.9rem" class="legal-preview"><?= $pg['content'] ?></div></details>
   <?php endforeach ?>

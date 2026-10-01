@@ -9,12 +9,12 @@
     <?php if ($st['changes']): ?><ul style="line-height:1.7;padding-left:18px"><?php foreach ($st['changes'] as $c): ?><li><code><?= e($c['sha']) ?></code> <?= e($c['message']) ?></li><?php endforeach ?></ul><?php endif ?>
     <?php if (!$writable): ?><div class="alert error"><?= e(__('I file del sito non sono scrivibili dal server web: sistema i permessi prima di aggiornare.')) ?></div>
     <?php elseif ($st['method'] === 'zip' && !$zip): ?><div class="alert error"><?= e(__('Per aggiornare senza Git serve l\'estensione PHP "zip".')) ?></div>
-    <?php else: ?><form method="post" action="<?= e(url('admin/updates/apply')) ?>" onsubmit="this.querySelector('button').disabled=true;this.querySelector('button').textContent='<?= e(__('Aggiornamento in corso…')) ?>'"><?= csrf_field() ?><button class="btn" type="submit"><?= e(__('Aggiorna ora')) ?></button>
+    <?php else: ?><form method="post" action="<?= e(url('admin/updates/apply')) ?>" data-busy="<?= e(__('Aggiornamento in corso…')) ?>"><?= csrf_field() ?><button class="btn" type="submit"><?= e(__('Aggiorna ora')) ?></button>
       <span class="muted"><?= e(__('Prima dell\'aggiornamento viene salvata una copia del database.')) ?></span></form><?php endif ?>
   <?php elseif (!$st['error']): ?><div class="alert success">✔ <?= e(__('Il negozio è aggiornato.')) ?></div><?php endif ?>
   <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap">
     <form method="post" action="<?= e(url('admin/updates/check')) ?>"><?= csrf_field() ?><button class="btn sec" type="submit"><?= e(__('Controlla adesso')) ?></button></form>
-    <?php if ($canRollback): ?><form method="post" action="<?= e(url('admin/updates/rollback')) ?>" onsubmit="return confirm('<?= e(__('Tornare alla versione precedente?')) ?>')"><?= csrf_field() ?><button class="btn sec" type="submit"><?= e(__('Torna alla versione precedente')) ?></button></form><?php endif ?></div></div>
+    <?php if ($canRollback): ?><form method="post" action="<?= e(url('admin/updates/rollback')) ?>" data-confirm="<?= e(__('Tornare alla versione precedente?')) ?>"><?= csrf_field() ?><button class="btn sec" type="submit"><?= e(__('Torna alla versione precedente')) ?></button></form><?php endif ?></div></div>
 <div class="card"><h2><?= e(__('Come funziona')) ?></h2><ul style="line-height:1.8;padding-left:18px">
   <li><?= e(__('Ogni aggiornamento pubblicato su GitHub può essere installato con un clic: i tuoi dati, le immagini e la configurazione non vengono toccati.')) ?></li>
   <li><?= e(__('Il database si aggiorna da solo e la cache viene svuotata.')) ?></li>

@@ -34,8 +34,12 @@ final class AccountController extends Controller
             } elseif (Auth::tooManyAttempts()) {
                 $data['error'] = __('Troppi tentativi. Riprova tra qualche minuto.');
             } elseif ($user = Auth::attempt($req->str('email'), (string)($req->post['password'] ?? ''))) {
-                Auth::login($user);
-                return Response::redirect($user['role'] === 'admin' ? 'admin' : 'account');
+                if ($user['role'] === 'admin') {
+                    $data['error'] = __('Gli amministratori accedono da %s.', url('admin/login'));
+                } else {
+                    Auth::login($user);
+                    return Response::redirect('account');
+                }
             } else {
                 $data['error'] = __('Credenziali non valide.');
             }
@@ -59,6 +63,8 @@ final class AccountController extends Controller
                 $data['error'] = __('Compila tutti i campi correttamente.');
             } elseif (strlen($password) < 8) {
                 $data['error'] = __('La password deve avere almeno 8 caratteri.');
+            } elseif (!\Alien\Core\RateLimit::hit('register', 6, 3600)) {
+                $data['error'] = __('Troppi tentativi. Riprova tra qualche minuto.');
             } elseif (DB::row('SELECT id FROM users WHERE email = ?', [$email])) {
                 $data['error'] = __('Esiste già un account con questa email.');
             } else {

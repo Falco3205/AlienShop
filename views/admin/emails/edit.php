@@ -10,9 +10,9 @@
 <button class="btn" type="submit"><?= e(__('Salva')) ?></button>
 <button class="btn sec" type="submit" formaction="<?= e(url('admin/emails/' . $id . '/preview')) ?>" formtarget="mail-preview"><?= e(__('Anteprima')) ?></button>
 <button class="btn sec" type="submit" formaction="<?= e(url('admin/emails/' . $id . '/test')) ?>"><?= e(__('Invia una prova a me')) ?></button></div></form>
-<form method="post" action="<?= e(url('admin/emails/' . $id . '/reset')) ?>" style="margin-top:14px" onsubmit="return confirm('<?= e(__('Tornare al testo originale?')) ?>')"><?= csrf_field() ?><button class="btn sec sm" type="submit"><?= e(__('Ripristina il testo originale')) ?></button></form></div>
+<form method="post" action="<?= e(url('admin/emails/' . $id . '/reset')) ?>" style="margin-top:14px" data-confirm="<?= e(__('Tornare al testo originale?')) ?>"><?= csrf_field() ?><button class="btn sec sm" type="submit"><?= e(__('Ripristina il testo originale')) ?></button></form></div>
 <div class="card"><h2><?= e(__('Anteprima')) ?></h2><iframe name="mail-preview" src="about:blank" style="width:100%;height:560px;border:1px solid #e5e7eb;border-radius:8px;background:#fff" title="<?= e(__('Anteprima')) ?>"></iframe></div></div>
-<script>
+<script nonce="<?= e(csp_nonce()) ?>">
 (function () {
   var body = document.getElementById('f_body');
   document.querySelectorAll('[data-ins]').forEach(function (b) {

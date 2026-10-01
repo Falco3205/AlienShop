@@ -35,7 +35,7 @@ final class ThemesController extends AdminController
         }
         foreach (['theme_primary', 'theme_accent', 'theme_bg', 'theme_text'] as $k) {
             $v = (string)($req->post[$k] ?? '');
-            Settings::set($k, !empty($req->post[$k . '_on']) && preg_match('/^#[0-9a-fA-F]{6}$/', $v) ? $v : '');
+            Settings::set($k, !empty($req->post[$k . '_on']) && preg_match('/^#[0-9a-fA-F]{6}$/D', $v) ? $v : '');
         }
         foreach (['logo', 'favicon', 'hero_image'] as $k) {
             if (!empty($req->post['remove_' . $k])) {

@@ -11,7 +11,7 @@ final class XmlParser
     {
         $doc = new \DOMDocument();
         $prev = libxml_use_internal_errors(true);
-        $ok = @$doc->loadXML($xml, LIBXML_NONET | LIBXML_NOBLANKS);
+        $ok = stripos($xml, '<!DOCTYPE') === false && stripos($xml, '<!ENTITY') === false && @$doc->loadXML($xml, LIBXML_NONET | LIBXML_NOBLANKS);
         libxml_clear_errors();
         libxml_use_internal_errors($prev);
         if (!$ok || !$doc->documentElement || !str_contains($doc->documentElement->localName ?? '', 'FatturaElettronica')) {
