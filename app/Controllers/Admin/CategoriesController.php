@@ -18,7 +18,7 @@ final class CategoriesController extends AdminController
             $counts[$r['category_id']] = $r['n'];
         }
         return $this->view('categories/index', [
-            'title' => __('Categorie'),
+            'title' => __('Categorie'), 'subtitle' => __('Organizza i prodotti in gruppi, anche annidati'),
             'actions' => '<a class="btn" href="' . e(url('admin/categories/new')) . '">+ ' . e(__('Nuova categoria')) . '</a>',
             'options' => Catalog::categoryOptions(),
             'all' => array_column(Catalog::categories(false), null, 'id'),

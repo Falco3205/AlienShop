@@ -27,6 +27,10 @@ Dopo l'installazione `/install` non è più raggiungibile (`storage/installed.lo
 - **Ordini**: stati, tracking, storico eventi, email transazionali (PHP mail o SMTP), ripristino scorte su annullo/rimborso, coupon (percentuale/fisso/spedizione gratuita), metodi e costi di spedizione per paese, IVA inclusa o esclusa.
 - **Clienti**: checkout ospite o con account, area ordini, profilo, recupero password via email.
 - **Rimborsi**: dal pannello ordine, con rimborso automatico su Stripe e PayPal e ripristino delle scorte. Stampa packing slip.
+- **Admin semplice**: menu raggruppato, ricerca globale, dashboard con saluto, checklist di primi passi, "da fare" (ordini da spedire, scorte basse), andamento con confronto sul periodo precedente, stati ordine con azioni rapide ("Segna come spedito e avvisa il cliente"), stati vuoti con pulsanti guida, anteprima Google e contatori di caratteri nel SEO.
+- **Statistiche interne** (senza cookie né dati personali): imbuto visite → carrello → checkout → ordini, prodotti più cliccati, più venduti, più messi nel carrello, nel carrello ma non comprati, visti ma mai comprati, ricerche dei clienti e ricerche senza risultati.
+- **Wizard Google Analytics 4**: guida passo passo, validazione dell'ID, eventi e-commerce (`view_item`, `add_to_cart`, `begin_checkout`, `purchase`), banner di consenso cookie (Analytics parte solo dopo l'accettazione) e verifica dell'installazione.
+- **Wizard pagine legali gratuito**: privacy policy (GDPR), cookie policy, termini e condizioni, resi e diritto di recesso (con modulo tipo), spedizioni, informazioni legali, in italiano o inglese, personalizzati con i tuoi dati e gli strumenti attivi (Stripe, PayPal, Analytics). Sono modelli generici: vanno riletti, non sostituiscono un legale.
 - **Admin**: duplica prodotto, immagine principale, editor HTML con barra strumenti, profilo e cambio password, IVA per paese.
 - **Pagine e blog**, redirect 301 manuali e CSV.
 

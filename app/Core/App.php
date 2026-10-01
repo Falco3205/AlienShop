@@ -91,6 +91,7 @@ final class App
         $r->get('/', [ShopController::class, 'home']);
         $r->get('/collections/{slug}', [ShopController::class, 'collection']);
         $r->get('/products/{slug}', [ShopController::class, 'product']);
+        $r->post('/t', [ShopController::class, 'beacon']);
         $r->get('/search', [ShopController::class, 'search']);
         $r->get('/pages/{slug}', [ShopController::class, 'page']);
         $r->get('/blog', [ShopController::class, 'blog']);

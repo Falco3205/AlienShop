@@ -9,9 +9,12 @@ use Alien\Core\Request;
 use Alien\Core\Response;
 use Alien\Core\Session;
 use Alien\Payments\Registry;
+use Alien\Core\Money;
+use Alien\Services\Analytics;
 use Alien\Services\Cart;
 use Alien\Services\Orders;
 use Alien\Services\Seo;
+use Alien\Services\Stats;
 use Alien\Services\Shipping;
 
 final class CheckoutController extends Controller
@@ -25,11 +28,23 @@ final class CheckoutController extends Controller
         $country = (string)old('country', setting('default_country', 'IT'));
         Seo::set(['title' => __('Checkout')]);
         Seo::noindex();
+        $totals = Cart::totals($lines, null, $country);
+        Analytics::event('begin_checkout', [
+            'currency' => Money::currency(), 'value' => Analytics::amount((int)$totals['total']),
+            'items' => array_values(array_map(static fn($l) => Analytics::item($l['product'], (int)$l['unit'], (int)$l['qty'], $l['label']), $lines)),
+        ]);
+        foreach ($lines as $l) {
+            $pid = (int)$l['product']['id'];
+            if (empty($_SESSION['stat_ck'][$pid])) {
+                $_SESSION['stat_ck'][$pid] = 1;
+                Stats::bump('checkouts', $pid);
+            }
+        }
         $errors = $_SESSION['_errors'] ?? [];
         unset($_SESSION['_errors']);
         return $this->noStore($this->render('checkout', [
             'lines' => $lines,
-            'totals' => Cart::totals($lines, null, $country),
+            'totals' => $totals,
             'gateways' => Registry::enabled(),
             'countries' => Shipping::countries(),
             'user' => Auth::user(),
@@ -136,6 +151,13 @@ final class CheckoutController extends Controller
         $order = Orders::findByToken($params['token']);
         if (!$order) {
             return $this->missing($req);
+        }
+        if ($order['payment_status'] === 'paid' || in_array($order['payment_method'], ['bank', 'cod'], true)) {
+            Analytics::event('purchase', [
+                'transaction_id' => $order['number'], 'currency' => $order['currency'],
+                'value' => Analytics::amount((int)$order['total']), 'tax' => Analytics::amount((int)$order['tax']), 'shipping' => Analytics::amount((int)$order['shipping']),
+                'items' => array_map(static fn($i) => Analytics::item(['sku' => $i['sku'], 'id' => $i['product_id'], 'name' => $i['name']], (int)$i['price'], (int)$i['qty'], $i['variant_label']), $order['items']),
+            ]);
         }
         Seo::set(['title' => __('Ordine %s', $order['number'])]);
         Seo::noindex();

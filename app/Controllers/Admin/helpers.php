@@ -42,3 +42,21 @@ function a_dt(?string $d): string
 {
     return $d ? date('d/m/Y H:i', strtotime($d)) : '';
 }
+
+function admin_counts(): array
+{
+    static $c = null;
+    if ($c === null) {
+        $c = [
+            'to_ship' => (int)\Alien\Core\DB::val("SELECT COUNT(*) FROM orders WHERE status = 'processing'"),
+            'pending' => (int)\Alien\Core\DB::val("SELECT COUNT(*) FROM orders WHERE status = 'pending' AND payment_status <> 'failed'"),
+        ];
+    }
+    return $c;
+}
+
+function a_empty(string $icon, string $title, string $text, ?string $href = null, string $cta = ''): string
+{
+    return '<div class="empty"><div class="empty-ico">' . $icon . '</div><h3>' . e($title) . '</h3><p>' . e($text) . '</p>'
+        . ($href ? '<a class="btn" href="' . e(url($href)) . '">' . e($cta) . '</a>' : '') . '</div>';
+}

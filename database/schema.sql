@@ -230,3 +230,22 @@ CREATE TABLE IF NOT EXISTS not_found_log (
   last_at VARCHAR(19) NOT NULL
 ){ENGINE};
 CREATE UNIQUE INDEX idx_nf_path ON not_found_log (path);
+
+CREATE TABLE IF NOT EXISTS product_stats (
+  id {PK},
+  day VARCHAR(10) NOT NULL,
+  product_id INTEGER NOT NULL,
+  views INTEGER NOT NULL DEFAULT 0,
+  carts INTEGER NOT NULL DEFAULT 0,
+  checkouts INTEGER NOT NULL DEFAULT 0
+){ENGINE};
+CREATE UNIQUE INDEX idx_ps_day_product ON product_stats (day, product_id);
+
+CREATE TABLE IF NOT EXISTS search_terms (
+  id {PK},
+  term VARCHAR(190) NOT NULL,
+  hits INTEGER NOT NULL DEFAULT 1,
+  zero INTEGER NOT NULL DEFAULT 0,
+  last_at VARCHAR(19) NOT NULL
+){ENGINE};
+CREATE UNIQUE INDEX idx_st_term ON search_terms (term);

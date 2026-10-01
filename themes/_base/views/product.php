@@ -9,13 +9,13 @@ $jsVariants = [];
 foreach ($p['variants'] as $v) {
     if (!$v['active']) { continue; }
     $jsVariants[] = [
-        'id' => (int)$v['id'], 'options' => $v['options'],
+        'id' => (int)$v['id'], 'options' => $v['options'], 'value' => Alien\Services\Analytics::amount((int)$v['final_price']),
         'html' => $priceHtml((int)$v['final_price'], (int)($v['compare_price'] ?? 0)),
         'stock_ok' => Alien\Services\Catalog::inStock($p, $v),
         'image' => $v['image'] ? upload_url($v['image']) : null,
     ];
 }
-$data = ['attributes' => array_column($p['attributes'], 'name'), 'variants' => $jsVariants, 'range' => $range, 't' => ['in' => __('Disponibile'), 'out' => __('Esaurito')]];
+$data = ['id' => (int)$p['id'], 'beacon' => url('t'), 'item' => Alien\Services\Analytics::item($p, (int)$p['price_min']), 'attributes' => array_column($p['attributes'], 'name'), 'variants' => $jsVariants, 'range' => $range, 't' => ['in' => __('Disponibile'), 'out' => __('Esaurito')]];
 ?>
 <?= partial('breadcrumbs', ['trail' => $trail]) ?>
 <div class="product">

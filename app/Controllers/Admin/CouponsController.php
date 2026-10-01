@@ -13,7 +13,7 @@ final class CouponsController extends AdminController
     public function index(): Response
     {
         return $this->view('coupons/index', [
-            'title' => __('Codici sconto'),
+            'title' => __('Codici sconto'), 'subtitle' => __('Promozioni in percentuale, importo fisso o spedizione gratuita'),
             'actions' => '<a class="btn" href="' . e(url('admin/coupons/new')) . '">+ ' . e(__('Nuovo codice')) . '</a>',
             'rows' => DB::all('SELECT * FROM coupons ORDER BY id DESC'),
         ], 'coupons');

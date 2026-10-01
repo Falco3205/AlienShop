@@ -8,8 +8,10 @@ use Alien\Core\Money;
 use Alien\Core\Request;
 use Alien\Core\Response;
 use Alien\Core\Str;
+use Alien\Services\Analytics;
 use Alien\Services\Catalog;
 use Alien\Services\Seo;
+use Alien\Services\Stats;
 
 final class ShopController extends Controller
 {
@@ -96,6 +98,7 @@ final class ShopController extends Controller
             return $this->missing($req);
         }
         Seo::forProduct($product);
+        Analytics::event('view_item', ['currency' => Money::currency(), 'value' => Analytics::amount((int)$product['price_min']), 'items' => [Analytics::item($product, (int)$product['price_min'])]]);
         return $this->render('product', [
             'product' => $product,
             'trail' => Seo::productTrail($product),
@@ -109,6 +112,9 @@ final class ShopController extends Controller
         $result = ['items' => [], 'total' => 0, 'page' => 1, 'pages' => 0];
         if ($q !== '') {
             $result = Catalog::lookup(['status' => 'active', 'q' => $q, 'per' => 24, 'page' => max(1, $req->int('page', 1))]);
+        }
+        if ($q !== '' && $result['page'] === 1) {
+            Stats::search($q, (int)$result['total']);
         }
         Seo::set(['title' => $q !== '' ? __('Risultati per "%s"', $q) : __('Cerca')]);
         Seo::noindex();
@@ -162,5 +168,14 @@ final class ShopController extends Controller
     {
         $segments = explode('/', trim($params['path'], '/'));
         return Response::redirect('collections/' . end($segments), 301);
+    }
+
+    public function beacon(Request $req): Response
+    {
+        $id = $req->int('p');
+        if ($id > 0 && DB::val("SELECT 1 FROM products WHERE id = ? AND status = 'active'", [$id])) {
+            Stats::bump('views', $id);
+        }
+        return new Response('', 204);
     }
 }

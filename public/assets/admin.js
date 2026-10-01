@@ -10,13 +10,15 @@
     m.addEventListener('change', function () { $$('input[name="ids[]"]').forEach(function (c) { c.checked = m.checked; }); });
   });
 
-  var type = document.getElementById('f_type');
+  var typeRadios = $$('input[name="type"][value]');
+  var type = typeRadios.length ? typeRadios[0] : null;
   function syncType() {
-    var variable = type && type.value === 'variable';
+    var checked = typeRadios.filter(function (r) { return r.checked; })[0];
+    var variable = checked && checked.value === 'variable';
     $$('[data-only-simple]').forEach(function (el) { el.style.display = variable ? 'none' : ''; });
     $$('[data-only-variable]').forEach(function (el) { el.style.display = variable ? '' : 'none'; });
   }
-  if (type) { type.addEventListener('change', syncType); syncType(); }
+  if (type) { typeRadios.forEach(function (r) { r.addEventListener('change', syncType); }); syncType(); }
 
   var addAttr = document.getElementById('add-attr');
   if (addAttr) {
@@ -61,6 +63,45 @@
     });
     ta.parentNode.insertBefore(bar, ta);
   });
+
+  $$('[data-bulk]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var mode = b.dataset.bulk;
+      $$('input[name$="[stock]"]').forEach(function (i) { if (mode === 'stock' && document.getElementById('bulk-stock').value !== '') i.value = document.getElementById('bulk-stock').value; });
+      $$('input[name$="[price]"][name^="variants"]').forEach(function (i) {
+        if (mode === 'price') i.value = document.getElementById('bulk-price').value;
+        if (mode === 'clear') i.value = '';
+      });
+    });
+  });
+
+  var gp = document.getElementById('gpreview');
+  if (gp) {
+    var f = function (n) { return document.getElementById('f_' + n); };
+    var render = function () {
+      var title = f('seo_title').value || f('name').value || '…';
+      var desc = f('seo_description').value || (f('short_description').value || f('description').value).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+      gp.querySelector('.u').textContent = gp.dataset.base + (f('slug').value || '…');
+      gp.querySelector('.t').textContent = title.length > 60 ? title.slice(0, 57) + '…' : title;
+      gp.querySelector('.d').textContent = desc.length > 160 ? desc.slice(0, 157) + '…' : desc;
+      [['seo_title', 60], ['seo_description', 160]].forEach(function (c) {
+        var label = f(c[0]).parentNode.querySelector('label'), span = label.querySelector('.counter');
+        if (!span) { span = document.createElement('span'); span.className = 'counter'; label.appendChild(span); }
+        var n = f(c[0]).value.length; span.textContent = n + '/' + c[1]; span.className = 'counter' + (n > c[1] ? ' bad' : '');
+      });
+    };
+    ['name', 'slug', 'seo_title', 'seo_description', 'short_description', 'description'].forEach(function (n) { f(n) && f(n).addEventListener('input', render); });
+    render();
+  }
+
+  var dirty = false;
+  $$('form.guard, .content form[enctype]').forEach(function (form) {
+    form.addEventListener('input', function () { dirty = true; });
+    form.addEventListener('submit', function () { dirty = false; });
+  });
+  window.addEventListener('beforeunload', function (e) { if (dirty) { e.preventDefault(); e.returnValue = ''; } });
+
+  $$('.alert.success').forEach(function (a) { setTimeout(function () { a.style.transition = 'opacity .5s'; a.style.opacity = '0'; setTimeout(function () { a.remove(); }, 600); }, 5000); });
 
   $$('[data-copy]').forEach(function (b) {
     b.addEventListener('click', function () { navigator.clipboard && navigator.clipboard.writeText(b.dataset.copy); b.textContent = '✓'; });

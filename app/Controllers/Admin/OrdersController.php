@@ -23,12 +23,16 @@ final class OrdersController extends AdminController
             $params[] = "%$q%";
             $params[] = "%$q%";
         }
+        $counts = ['all' => (int)DB::val('SELECT COUNT(*) FROM orders')];
+        foreach (DB::all('SELECT status, COUNT(*) AS n FROM orders GROUP BY status') as $r) {
+            $counts[$r['status']] = (int)$r['n'];
+        }
         $sql = $where ? ' WHERE ' . implode(' AND ', $where) : '';
         $page = $this->page($req);
         $per = 25;
         $total = (int)DB::val("SELECT COUNT(*) FROM orders$sql", $params);
         $orders = DB::all("SELECT * FROM orders$sql ORDER BY id DESC LIMIT $per OFFSET " . (($page - 1) * $per), $params);
-        return $this->view('orders/index', ['title' => __('Ordini'), 'orders' => $orders, 'pg' => $this->paginate($total, $page, $per)], 'orders');
+        return $this->view('orders/index', ['title' => __('Ordini'), 'subtitle' => __('Gestisci e spedisci gli ordini dei tuoi clienti'), 'counts' => $counts, 'orders' => $orders, 'pg' => $this->paginate($total, $page, $per)], 'orders');
     }
 
     public function show(Request $req, array $params): Response
@@ -41,6 +45,10 @@ final class OrdersController extends AdminController
             $action = $req->str('action');
             if ($action === 'status') {
                 Orders::setStatus((int)$order['id'], $req->str('status'), mb_substr($req->str('tracking'), 0, 190));
+            } elseif ($action === 'ship') {
+                Orders::setStatus((int)$order['id'], 'shipped', mb_substr($req->str('tracking'), 0, 190));
+            } elseif ($action === 'complete') {
+                Orders::setStatus((int)$order['id'], 'completed');
             } elseif ($action === 'paid') {
                 Orders::markPaid($order, 'manual');
             } elseif ($action === 'refund') {
@@ -72,6 +80,6 @@ final class OrdersController extends AdminController
     {
         $rows = DB::all("SELECT u.id, u.name, u.email, u.created_at, COUNT(o.id) AS orders, COALESCE(SUM(CASE WHEN o.status NOT IN ('cancelled','refunded') THEN o.total END),0) AS spent
             FROM users u LEFT JOIN orders o ON o.user_id = u.id WHERE u.role = 'customer' GROUP BY u.id, u.name, u.email, u.created_at ORDER BY u.id DESC LIMIT 200");
-        return $this->view('orders/customers', ['title' => __('Clienti'), 'rows' => $rows], 'customers');
+        return $this->view('orders/customers', ['title' => __('Clienti'), 'subtitle' => __('Chi ha creato un account nel tuo negozio'), 'rows' => $rows], 'customers');
     }
 }

@@ -230,6 +230,17 @@ final class Orders
         $row = DB::row("SELECT COUNT(*) AS orders, COALESCE(SUM(total),0) AS revenue FROM orders WHERE created_at >= ? AND status NOT IN ('cancelled','refunded')", [$since]);
         $daily = DB::all("SELECT SUBSTR(created_at,1,10) AS d, COUNT(*) AS n, COALESCE(SUM(total),0) AS t FROM orders WHERE created_at >= ? AND status NOT IN ('cancelled','refunded') GROUP BY SUBSTR(created_at,1,10) ORDER BY d", [$since]);
         $top = DB::all("SELECT oi.name, SUM(oi.qty) AS qty, SUM(oi.total) AS total FROM order_items oi JOIN orders o ON o.id = oi.order_id WHERE o.created_at >= ? AND o.status NOT IN ('cancelled','refunded') GROUP BY oi.name ORDER BY qty DESC LIMIT 5", [$since]);
-        return ['orders' => (int)$row['orders'], 'revenue' => (int)$row['revenue'], 'daily' => $daily, 'top' => $top];
+        $prevFrom = date('Y-m-d 00:00:00', strtotime('-' . ($days * 2) . ' days'));
+        $prev = DB::row("SELECT COUNT(*) AS orders, COALESCE(SUM(total),0) AS revenue FROM orders WHERE created_at >= ? AND created_at < ? AND status NOT IN ('cancelled','refunded')", [$prevFrom, $since]);
+        $series = [];
+        foreach ($daily as $d) {
+            $series[$d['d']] = (int)$d['t'];
+        }
+        $filled = [];
+        for ($i = $days - 1; $i >= 0; $i--) {
+            $day = date('Y-m-d', strtotime("-$i days"));
+            $filled[] = ['d' => $day, 't' => $series[$day] ?? 0];
+        }
+        return ['orders' => (int)$row['orders'], 'revenue' => (int)$row['revenue'], 'prev_orders' => (int)$prev['orders'], 'prev_revenue' => (int)$prev['revenue'], 'daily' => $filled, 'top' => $top];
     }
 }

@@ -110,8 +110,11 @@ final class Catalog
         if (!empty($filters['in_stock'])) {
             $where[] = 'p.in_stock = 1';
         }
+        if (!empty($filters['out_of_stock'])) {
+            $where[] = 'p.in_stock = 0';
+        }
         if (!empty($filters['low_stock'])) {
-            $where[] = 'p.manage_stock = 1 AND p.stock_qty <= 3';
+            $where[] = "p.manage_stock = 1 AND p.in_stock = 1 AND p.stock_qty <= 3 AND p.type = 'simple'";
         }
         $order = match ($filters['sort'] ?? 'new') {
             'price_asc' => 'p.price_min ASC, p.id DESC',

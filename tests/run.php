@@ -329,7 +329,8 @@ t('Http::isPublicUrl blocca indirizzi privati (SSRF)', function () {
 
 out("Nuove funzioni\n");
 t('reset password: token valido, scaduto, manomesso e monouso', function () {
-    \Alien\Core\Config::write(['app' => ['url' => 'http://shop.test', 'key' => 'k'], 'db' => []]);
+    $ref = new ReflectionProperty(\Alien\Core\Config::class, 'data');
+    $ref->setValue(null, ['app' => ['url' => 'http://shop.test', 'key' => 'k'], 'db' => []]);
     $uid = Alien\Core\Auth::create('reset@test.dev', 'password-old-1', 'R');
     $user = DB::row('SELECT * FROM users WHERE id = ?', [$uid]);
     $token = Alien\Core\Auth::resetToken($user);
@@ -338,7 +339,7 @@ t('reset password: token valido, scaduto, manomesso e monouso', function () {
     eq(Alien\Core\Auth::userFromResetToken($token . 'x'), null, 'manomesso');
     Alien\Core\Auth::setPassword($uid, 'password-new-2');
     eq(Alien\Core\Auth::userFromResetToken($token), null, 'usato una volta');
-    @unlink(ROOT . '/config/config.php');
+    $ref->setValue(null, null);
 });
 t('tasse per paese', function () {
     Settings::set('tax_country_rates', "DE=19\nfr = 20,5");
@@ -380,6 +381,57 @@ t('immagine principale riordina le immagini', function () {
     Catalog::setMainImage($id, $second);
     eq(Catalog::product($id)['image'], 'b.webp');
     DB::delete('product_images', 'product_id = ?', [$id]);
+});
+
+t('Analytics: validazione ID, eventi e rendering', function () {
+    eq([Alien\Services\Analytics::validId('G-ABC123XYZ9'), Alien\Services\Analytics::validId('UA-123-1'), Alien\Services\Analytics::validId('g-abc')], [true, false, false]);
+    eq(Alien\Services\Analytics::render(), '', 'senza ID non stampa nulla');
+    Settings::setMany(['analytics_id' => 'g-abc123xyz9', 'analytics_ecommerce' => 1, 'analytics_consent' => 1]);
+    Alien\Services\Analytics::event('view_item', ['items' => [Alien\Services\Analytics::item(['id' => 5, 'sku' => '', 'name' => 'X</script>', 'price' => 1990], 1990)]]);
+    $html = Alien\Services\Analytics::render();
+    eq(str_contains($html, '"id":"G-ABC123XYZ9"') && str_contains($html, '"price":19.9') && str_contains($html, '"consent":true'), true);
+    eq(str_contains($html, '</script>X'), false);
+    eq(substr_count($html, '</script>'), 1, 'nessuna chiusura script iniettata');
+    Http::$fake = fn() => ['status' => 200, 'body' => '<script>window.ASGA={"id":"G-ABC123XYZ9"}</script>', 'error' => '', 'json' => null];
+    eq(Alien\Services\Analytics::check()['ok'], true);
+    Http::$fake = fn() => ['status' => 200, 'body' => '<html></html>', 'error' => '', 'json' => null];
+    eq(Alien\Services\Analytics::check()['ok'], false);
+    Http::$fake = null;
+});
+
+t('Pagine legali: generazione IT/EN e pubblicazione idempotente', function () {
+    $profile = ['company' => 'Acme Srl', 'legal_form' => 'S.r.l.', 'address' => 'Via Roma 1, Milano', 'vat' => 'IT123', 'withdrawal_days' => 30, 'return_shipping' => 'seller', 'excluded_custom' => 1] + Alien\Services\LegalTemplates::defaults();
+    foreach (['it', 'en'] as $loc) {
+        $pages = Alien\Services\LegalTemplates::build($profile, $loc);
+        eq(array_keys($pages), array_keys(Alien\Services\LegalTemplates::PAGES));
+        eq(str_contains($pages['privacy-policy']['content'], 'Acme Srl'), true);
+        eq(str_contains($pages['resi-e-recesso']['content'], '30'), true);
+    }
+    eq(str_contains(Alien\Services\LegalTemplates::build($profile, 'it')['resi-e-recesso']['content'], 'a nostro carico'), true);
+    eq(Alien\Services\LegalTemplates::publish(['privacy-policy', 'cookie-policy', 'nope'], $profile, 'it'), 2);
+    eq(Alien\Services\LegalTemplates::publish(['privacy-policy'], $profile, 'it'), 1);
+    eq((int)DB::val("SELECT COUNT(*) FROM pages WHERE slug = 'privacy-policy'"), 1);
+    $profile['company'] = '<b>X</b>';
+    eq(str_contains(Alien\Services\LegalTemplates::build($profile, 'it')['privacy-policy']['content'], '<b>X</b>'), false, 'escape');
+});
+t('Statistiche: visite, carrelli, vendite e abbandoni', function () {
+    $_SERVER['HTTP_USER_AGENT'] = 'Mozilla/5.0';
+    $id = Catalog::save(['name' => 'Stat prod', 'price' => 1000, 'manage_stock' => 0]);
+    for ($i = 0; $i < 10; $i++) { Alien\Services\Stats::bump('views', $id); }
+    Alien\Services\Stats::bump('carts', $id, 5);
+    Alien\Services\Stats::bump('checkouts', $id, 2);
+    $_SERVER['HTTP_USER_AGENT'] = 'Googlebot/2.1';
+    Alien\Services\Stats::bump('views', $id, 100);
+    $_SERVER['HTTP_USER_AGENT'] = 'Mozilla/5.0';
+    $oid = DB::insert('orders', ['number' => 'ST-1', 'token' => 'tk-st', 'email' => 'a@b.c', 'status' => 'processing', 'payment_status' => 'paid', 'payment_method' => 'bank', 'total' => 2000, 'created_at' => now(), 'updated_at' => now()]);
+    DB::insert('order_items', ['order_id' => $oid, 'product_id' => $id, 'name' => 'Stat prod', 'price' => 1000, 'qty' => 2, 'total' => 2000]);
+    Alien\Services\Stats::search('Scarpe Rosse', 0);
+    Alien\Services\Stats::search('scarpe rosse', 0);
+    $r = Alien\Services\Stats::report(7);
+    $pick = static fn(array $rows) => array_values(array_filter($rows, static fn($x) => (int)$x['id'] === $id))[0];
+    eq([$pick($r['viewed'])['views'], $pick($r['carted'])['carts'], $pick($r['sold'])['sold'], $pick($r['abandoned'])['abandoned']], [10, 5, 2, 3], 'bot escluso');
+    eq($r['funnel']['views'] >= 10 && $r['funnel']['orders'] >= 1, true);
+    eq([$r['searches'][0]['term'], (int)$r['searches'][0]['hits'], (int)$r['noResults'][0]['zero']], ['scarpe rosse', 2, 2]);
 });
 
 out("\n$passed ok, $failed falliti\n");

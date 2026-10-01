@@ -10,7 +10,7 @@ PHP 8.1+ senza dipendenze, PDO con SQLite o MySQL. Il front controller è `publi
 
 | Percorso | Contenuto |
 |---|---|
-| `app/Core` | App (routing, cache pagine, errori), Config, DB, Request/Response/Router, Session, Csrf, Auth, Settings, View (con fallback tema → `_base`), Lang, Money, Str, ImageProcessor (GD→WebP), Http (cURL + anti-SSRF, reset password, rimborsi, IVA per paese, log 404, immagine principale), Mailer (mail/SMTP), Cache |
+| `app/Core` | App (routing, cache pagine, errori), Config, DB, Request/Response/Router, Session, Csrf, Auth, Settings, View (con fallback tema → `_base`), Lang, Money, Str, ImageProcessor (GD→WebP), Http (cURL + anti-SSRF, reset password, rimborsi, IVA per paese, log 404, immagine principale, Analytics, pagine legali, statistiche), Mailer (mail/SMTP), Cache |
 | `app/Services` | Catalog (prodotti, attributi, varianti, categorie), Cart, Coupons, Shipping, Orders, Redirects, Seo, Sitemap, IndexNow, Themes, Installer, Demo |
 | `app/Payments` | `Gateway` astratto, Stripe, PayPal, Bank, Cod, `Registry` (auto-discovery di `*Gateway.php`) |
 | `app/Import` | CsvReader, Writer, WooImporter, ShopifyImporter, Exporter, Result |
@@ -29,6 +29,12 @@ PHP 8.1+ senza dipendenze, PDO con SQLite o MySQL. Il front controller è `publi
 
 **Recupero password.** Token senza stato (`Auth::resetToken`): HMAC con `app.key` su id, scadenza e un frammento dell'hash della password, quindi diventa invalido dopo l'uso. Risposta identica per email esistenti e non (niente enumerazione) e limite ai tentativi.
 
+**Statistiche.** `product_stats` (contatori giornalieri per prodotto: visite, aggiunte al carrello, checkout) e `search_terms`. Le visite arrivano da un `sendBeacon` su `/t` (le pagine sono in cache statica); carrello e checkout sono contati lato server in `Cart::add` e `CheckoutController::show`. Bot e admin (cookie `as_admin`) sono esclusi. Le vendite vengono da `order_items`; "nel carrello ma non comprati" = aggiunte − unità vendute.
+
+**Google Analytics.** `Analytics::render()` emette `window.ASGA` (ID, consenso, eventi della pagina); `app.js` carica gtag solo dopo il consenso (localStorage `as_consent`), accoda gli eventi e deduplica `purchase` per transazione. Il wizard (`/admin/analytics`) valida `G-XXXXXXXXXX` e verifica la home.
+
+**Pagine legali.** `LegalTemplates::build($profilo, $lingua)` genera 6 pagine da un profilo salvato in `settings.legal_profile`; `publish()` le crea o aggiorna per slug. Tutti i valori inseriti sono escapati.
+
 **Rimborsi.** `Gateway::refund()` (Stripe `/v1/refunds` sul `payment_intent`, PayPal `/captures/{id}/refund`); l'ordine passa a `refunded` solo se il gateway conferma.
 
 **Redirect.** `Redirects::add()` appiattisce le catene. Ogni cambio slug in `Catalog::save/saveCategory` e nelle pagine crea un 301; una pagina 404 per un URL sconosciuto consulta la tabella prima di rispondere.
@@ -43,7 +49,7 @@ PHP 8.1+ senza dipendenze, PDO con SQLite o MySQL. Il front controller è `publi
 
 ## Verifica eseguita
 
-`php tests/run.php` (32 test: formati monetari, prezzi variante, redirect, carrello, scorte, coupon, firme Stripe, flusso Stripe/PayPal con HTTP simulato, SEO, import/export con round trip, anti-SSRF, reset password, rimborsi, IVA per paese, log 404, immagine principale). Test manuali via browser: wizard, tutte le pagine admin, flusso carrello→checkout→ordine, cache/304/gzip, redirect, anteprima dei 10 temi.
+`php tests/run.php` (35 test: formati monetari, prezzi variante, redirect, carrello, scorte, coupon, firme Stripe, flusso Stripe/PayPal con HTTP simulato, SEO, import/export con round trip, anti-SSRF, reset password, rimborsi, IVA per paese, log 404, immagine principale, Analytics, pagine legali, statistiche). Test manuali via browser: wizard, tutte le pagine admin, flusso carrello→checkout→ordine, cache/304/gzip, redirect, anteprima dei 10 temi.
 
 **Non verificato con servizi reali**: chiamate a Stripe, PayPal, SMTP e IndexNow (nessuna credenziale/rete nel test); sono coperte solo con risposte simulate e verifica delle firme.
 

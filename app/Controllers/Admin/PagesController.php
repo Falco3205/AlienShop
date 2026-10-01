@@ -15,7 +15,7 @@ final class PagesController extends AdminController
     public function index(): Response
     {
         return $this->view('pages/index', [
-            'title' => __('Pagine e blog'),
+            'title' => __('Pagine e blog'), 'subtitle' => __('Contenuti come Chi siamo, Privacy e articoli del blog'),
             'actions' => '<a class="btn sec" href="' . e(url('admin/pages/new?type=post')) . '">+ ' . e(__('Articolo')) . '</a> <a class="btn" href="' . e(url('admin/pages/new')) . '">+ ' . e(__('Pagina')) . '</a>',
             'rows' => DB::all('SELECT * FROM pages ORDER BY type, id DESC'),
         ], 'pages');

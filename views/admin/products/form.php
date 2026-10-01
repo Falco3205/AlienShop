@@ -43,6 +43,10 @@ $tpl = static function (string $i, string $name = '', string $values = ''): stri
 
     <?php if (!empty($p['variants'])): ?>
       <h2 style="margin-top:24px"><?= e(__('Varianti')) ?> (<?= count($p['variants']) ?>)</h2>
+      <div class="bulkbar"><strong><?= e(__('Applica a tutte:')) ?></strong>
+        <input type="number" id="bulk-stock" placeholder="<?= e(__('Scorta')) ?>"><button type="button" class="btn sec sm" data-bulk="stock"><?= e(__('Imposta scorta')) ?></button>
+        <input type="text" id="bulk-price" placeholder="<?= e(__('Prezzo')) ?>" inputmode="decimal"><button type="button" class="btn sec sm" data-bulk="price"><?= e(__('Imposta prezzo')) ?></button>
+        <button type="button" class="btn sec sm" data-bulk="clear"><?= e(__('Azzera prezzi personalizzati')) ?></button></div>
       <table><thead><tr><th><?= e(__('Variante')) ?></th><th>SKU</th><th><?= e(__('Prezzo (override)')) ?></th><th><?= e(__('Listino')) ?></th><th><?= e(__('Stock')) ?></th><th><?= e(__('Attiva')) ?></th></tr></thead><tbody>
       <?php foreach ($p['variants'] as $i => $var): ?>
         <tr>
@@ -58,6 +62,7 @@ $tpl = static function (string $i, string $name = '', string $values = ''): stri
   </div>
 
   <div class="card"><h2><?= e(__('SEO (Google, Bing)')) ?></h2>
+    <div class="gpreview" id="gpreview" data-base="<?= e(url('products/')) ?>"><div class="u"></div><div class="t"></div><div class="d"></div></div>
     <?= a_input('slug', __('URL (slug)'), $v('slug'), 'text', ['data-slug-from' => 'f_name'], e(url('products/')) . '<strong>' . e($v('slug', '…')) . '</strong> — ' . e(__('se lo cambi, viene creato automaticamente un redirect 301 dal vecchio indirizzo.')) ) ?>
     <?= a_input('seo_title', __('Titolo SEO'), $v('seo_title'), 'text', ['maxlength' => 190], __('Consigliati max 60 caratteri. Vuoto = nome prodotto.')) ?>
     <?= a_textarea('seo_description', __('Meta description'), $v('seo_description'), 2, __('Consigliati max 160 caratteri. Vuoto = generata dalla descrizione.')) ?>
@@ -68,7 +73,9 @@ $tpl = static function (string $i, string $name = '', string $values = ''): stri
 <div>
   <div class="card"><h2><?= e(__('Pubblicazione')) ?></h2>
     <?= a_select('status', __('Stato'), ['active' => __('Attivo'), 'draft' => __('Bozza')], $v('status', 'active')) ?>
-    <?= a_select('type', __('Tipo di prodotto'), ['simple' => __('Semplice'), 'variable' => __('Variabile (attributi e varianti)')], $v('type', 'simple')) ?>
+    <div class="field"><label><?= e(__('Tipo di prodotto')) ?></label><div class="type-cards">
+      <label><input type="radio" name="type" value="simple" <?= $v('type', 'simple') === 'simple' ? 'checked' : '' ?>>📦 <?= e(__('Semplice')) ?><small><?= e(__('Un solo prezzo e una sola scorta.')) ?></small></label>
+      <label><input type="radio" name="type" value="variable" <?= $v('type', 'simple') === 'variable' ? 'checked' : '' ?>>🎛️ <?= e(__('Con varianti')) ?><small><?= e(__('Taglie, colori, materiali… con prezzi diversi.')) ?></small></label></div></div>
     <?= a_check('featured', __('In evidenza nella home'), $v('featured')) ?>
     <?php if (!$isNew): ?><p><a href="<?= e(url('products/' . $p['slug'])) ?>" target="_blank" rel="noopener">↗ <?= e(__('Vedi nel negozio')) ?></a></p><?php endif ?>
   </div>

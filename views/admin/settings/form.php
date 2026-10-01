@@ -1,7 +1,7 @@
 <?php if ($tab !== 'payments'): ?>
-<div class="tabs"><?php foreach (['general' => [__('Generali'), 'admin/settings'], 'seo' => ['SEO', 'admin/settings/seo'], 'mail' => ['Email', 'admin/settings/mail']] as $k => [$l, $href]): ?><a class="<?= $tab === $k ? 'on' : '' ?>" href="<?= e(url($href)) ?>"><?= e($l) ?></a><?php endforeach ?></div>
+<div class="tabs"><?php foreach (['general' => [__('Negozio'), 'admin/settings/general'], 'seo' => ['SEO', 'admin/settings/seo'], 'mail' => ['Email', 'admin/settings/mail']] as $k => [$l, $href]): ?><a class="<?= $tab === $k ? 'on' : '' ?>" href="<?= e(url($href)) ?>"><?= e($l) ?></a><?php endforeach ?></div>
 <?php endif ?>
-<form method="post" action="<?= e(url($tab === 'payments' ? 'admin/payments' : ($tab === 'general' ? 'admin/settings' : 'admin/settings/' . $tab))) ?>"><?= csrf_field() ?>
+<form method="post" action="<?= e(url($tab === 'payments' ? 'admin/payments' : 'admin/settings/' . $tab)) ?>"><?= csrf_field() ?>
 <?php foreach ($groups as $label => $fields): ?>
   <div class="card" style="max-width:820px"><h2><?= e($label) ?></h2>
   <?php foreach ($fields as $f):

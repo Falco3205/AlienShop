@@ -13,7 +13,7 @@ final class ImportController extends AdminController
 {
     public function index(): Response
     {
-        return $this->view('import/index', ['title' => __('Import / Export prodotti')], 'import');
+        return $this->view('import/index', ['title' => __('Import / Export prodotti'), 'subtitle' => __('Porta qui il tuo catalogo, o portalo altrove')], 'import');
     }
 
     public function import(Request $req): Response

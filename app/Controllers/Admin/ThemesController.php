@@ -14,7 +14,7 @@ final class ThemesController extends AdminController
     public function index(): Response
     {
         return $this->view('themes/index', [
-            'title' => __('Temi'),
+            'title' => __('Aspetto e temi'), 'subtitle' => __('Scegli un tema e personalizzalo: le modifiche sono immediate'),
             'themes' => Themes::all(),
             'active' => \Alien\Core\View::theme(),
         ], 'themes');
@@ -23,6 +23,7 @@ final class ThemesController extends AdminController
     public function activate(Request $req): Response
     {
         $ok = Themes::activate($req->str('theme'));
+        $ok && Settings::set('theme_customized', 1);
         return $this->back('admin/themes', $ok ? __('Tema attivato.') : __('Tema non valido.'), $ok ? 'success' : 'error');
     }
 
@@ -48,6 +49,7 @@ final class ThemesController extends AdminController
                 }
             }
         }
+        Settings::set('theme_customized', 1);
         Themes::build(\Alien\Core\View::theme());
         return $this->back('admin/themes', __('Personalizzazione salvata.'));
     }

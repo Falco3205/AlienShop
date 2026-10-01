@@ -22,10 +22,13 @@ final class ProductsController extends AdminController
             'page' => $this->page($req),
             'per' => 25,
             'sort' => 'new',
+            'low_stock' => $req->str('stock') === 'low',
+            'out_of_stock' => $req->str('stock') === 'out',
         ];
         $result = Catalog::lookup($filters);
         return $this->view('products/index', [
             'title' => __('Prodotti'),
+            'subtitle' => __('Il tuo catalogo: clicca un prodotto per modificarlo'),
             'actions' => '<a class="btn" href="' . e(url('admin/products/new')) . '">+ ' . e(__('Nuovo prodotto')) . '</a>',
             'result' => $result,
             'filters' => $filters,

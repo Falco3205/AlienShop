@@ -40,6 +40,9 @@ final class Routes
         };
 
         $add('GET', '/admin', DashboardController::class, 'index');
+        $add('POST', '/admin/dismiss-onboarding', DashboardController::class, 'dismiss');
+        $add('POST', '/admin/remove-demo', DashboardController::class, 'removeDemo');
+        $add('GET', '/admin/search', SearchController::class, 'index');
         $both('/admin/login', AuthController::class, 'login', true);
         $add('POST', '/admin/logout', AuthController::class, 'logout');
 
@@ -75,8 +78,12 @@ final class Routes
         $add('POST', '/admin/themes/activate', ThemesController::class, 'activate');
         $add('POST', '/admin/themes/customize', ThemesController::class, 'customize');
 
+        $add('GET', '/admin/stats', StatsController::class, 'index');
+        $both('/admin/legal', LegalController::class, 'wizard');
+        $both('/admin/analytics', AnalyticsController::class, 'wizard');
         $both('/admin/profile', ProfileController::class, 'form');
-        $both('/admin/settings', SettingsController::class, 'general');
+        $add('GET', '/admin/settings', SettingsController::class, 'hub');
+        $both('/admin/settings/general', SettingsController::class, 'general');
         $both('/admin/settings/seo', SettingsController::class, 'seo');
         $both('/admin/settings/mail', SettingsController::class, 'mail');
         $both('/admin/payments', SettingsController::class, 'payments');

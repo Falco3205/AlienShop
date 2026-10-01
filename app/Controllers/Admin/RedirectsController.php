@@ -24,7 +24,7 @@ final class RedirectsController extends AdminController
             return $this->back('admin/redirects', __('Indica il percorso di origine.'), 'error');
         }
         return $this->view('redirects/index', [
-            'title' => __('Redirect 301'),
+            'title' => __('Redirect e 404'), 'subtitle' => __('Non perdere visitatori e posizionamento quando un indirizzo cambia'),
             'rows' => DB::all('SELECT * FROM redirects ORDER BY id DESC LIMIT 500'),
             'missing' => DB::all('SELECT * FROM not_found_log ORDER BY hits DESC, last_at DESC LIMIT 30'),
         ], 'redirects');

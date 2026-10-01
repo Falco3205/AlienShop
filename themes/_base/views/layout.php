@@ -17,6 +17,7 @@ $logo = setting('logo');
 <link rel="preload" href="<?= e(asset($assets['css'])) ?>" as="style">
 <link rel="stylesheet" href="<?= e(asset($assets['css'])) ?>">
 <?php if ($fav = setting('favicon')): ?><link rel="icon" href="<?= e(upload_url($fav)) ?>"><?php else: ?><link rel="icon" href="<?= e(asset('favicon.svg')) ?>" type="image/svg+xml"><?php endif ?>
+<?= Alien\Services\Analytics::render() ?>
 <?= setting('head_code', '') ?>
 </head>
 <body class="<?= e(Themes::layoutClasses($themeSlug)) ?>">
@@ -60,17 +61,20 @@ $logo = setting('logo');
         <?php foreach (array_slice($nav['categories'], 0, 5) as $c): ?><li><a href="<?= e(url('collections/' . $c['slug'])) ?>"><?= e($c['name']) ?></a></li><?php endforeach ?></ul></div>
       <div><h4><?= e(__('Informazioni')) ?></h4><ul>
         <?php foreach ($nav['footer_pages'] as $p): ?><li><a href="<?= e(url('pages/' . $p['slug'])) ?>"><?= e($p['title']) ?></a></li><?php endforeach ?>
-        <li><a href="<?= e(url('account')) ?>"><?= e(__('Il mio account')) ?></a></li></ul></div>
+        <li><a href="<?= e(url('account')) ?>"><?= e(__('Il mio account')) ?></a></li>
+        <?php if (Alien\Services\Analytics::enabled() && Alien\Services\Analytics::consentRequired()): ?><li><a href="#" data-cookie-settings><?= e(__('Preferenze cookie')) ?></a></li><?php endif ?></ul></div>
     </div>
     <div class="copyright"><span>© <?= date('Y') ?> <?= e($store) ?></span><span><?= e(setting('footer_note', '')) ?></span></div>
   </div>
 </footer>
+<?php if (Alien\Services\Analytics::enabled() && Alien\Services\Analytics::consentRequired()): ?>
+<div id="cookie-banner" class="cookie" role="dialog" aria-label="<?= e(__('Cookie')) ?>" hidden>
+  <p><?= e(__('Usiamo cookie di analisi anonimi per migliorare il negozio.')) ?> <a href="<?= e(url('pages/privacy-policy')) ?>"><?= e(__('Privacy policy')) ?></a></p>
+  <div><button type="button" class="btn btn-outline btn-sm" data-consent="denied"><?= e(__('Rifiuta')) ?></button> <button type="button" class="btn btn-sm" data-consent="granted"><?= e(__('Accetta')) ?></button></div></div>
+<?php endif ?>
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 <script src="<?= e(asset($assets['js'])) ?>" defer></script>
-<?php if ($ga = setting('analytics_id')): ?>
-<script async src="https://www.googletagmanager.com/gtag/js?id=<?= e($ga) ?>"></script>
-<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag('js',new Date());gtag('config','<?= e($ga) ?>');</script>
-<?php endif ?>
+
 <?= setting('footer_code', '') ?>
 </body>
 </html>

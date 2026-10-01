@@ -53,6 +53,7 @@ final class Cart
         }
         $items[$key] = ['pid' => $productId, 'vid' => (int)($variant['id'] ?? 0), 'qty' => $newQty];
         self::store($items);
+        Stats::bump('carts', $productId, max(1, $qty));
         return null;
     }
 

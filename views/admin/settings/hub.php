@@ -1,0 +1,1 @@
+<div class="hub"><?php foreach ($cards as [$href, $ico, $label, $text]): ?><a href="<?= e(url($href)) ?>"><strong><?= $ico ?> <?= e($label) ?></strong><span><?= e($text) ?></span></a><?php endforeach ?></div>

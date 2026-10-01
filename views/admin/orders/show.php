@@ -1,4 +1,10 @@
 <?php $cur = $o['currency']; $f = static fn($c) => Alien\Core\Money::format((int)$c, $cur); $s = $o['shipping_address']; ?>
+<?php $flow = ['pending' => 0, 'processing' => 1, 'shipped' => 2, 'completed' => 3]; $pos = $flow[$o['status']] ?? -1; ?>
+<?php if ($pos >= 0): ?><div class="steps-flow"><?php foreach ([__('Ricevuto'), __('In lavorazione'), __('Spedito'), __('Completato')] as $i => $l): ?><span class="<?= $i <= $pos ? 'on' : '' ?>"><?= e($l) ?></span><?php endforeach ?></div><?php else: ?><p><?= a_status($o['status']) ?></p><?php endif ?>
+<?php if (in_array($o['status'], ['pending', 'processing'], true)): ?><div class="card" style="background:#f5f2ff"><h2><?= e(__('Prossimo passo: spedisci l\'ordine')) ?></h2>
+  <?php if ($o['payment_status'] !== 'paid'): ?><p class="muted"><?= e(__('Il pagamento non è ancora stato ricevuto.')) ?> <?= e($o['payment_method']) ?></p><?php endif ?>
+  <form method="post" style="display:flex;gap:8px;flex-wrap:wrap"><?= csrf_field() ?><input type="hidden" name="action" value="ship"><input name="tracking" placeholder="<?= e(__('Codice tracking (opzionale)')) ?>" style="max-width:280px"><button class="btn" type="submit">🚚 <?= e(__('Segna come spedito e avvisa il cliente')) ?></button></form></div>
+<?php elseif ($o['status'] === 'shipped'): ?><div class="card" style="background:#f5f2ff"><form method="post" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><?= csrf_field() ?><input type="hidden" name="action" value="complete"><span><?= e(__('Ordine spedito. Quando il cliente lo riceve:')) ?></span><button class="btn" type="submit">✓ <?= e(__('Segna come completato')) ?></button></form></div><?php endif ?>
 <div class="grid2"><div>
   <div class="card"><h2><?= e(__('Articoli')) ?></h2><table><tbody>
   <?php foreach ($o['items'] as $it): ?><tr><td><?= e($it['name']) ?><?php if ($it['variant_label']): ?> <span class="muted">(<?= e($it['variant_label']) ?>)</span><?php endif ?><div class="muted"><?= e($it['sku']) ?></div></td><td><?= e($f($it['price'])) ?> × <?= (int)$it['qty'] ?></td><td class="right"><?= e($f($it['total'])) ?></td></tr><?php endforeach ?>

@@ -2,6 +2,7 @@
   <form method="get" action="<?= e(url('admin/products')) ?>">
     <input type="search" name="q" placeholder="<?= e(__('Cerca per nome, SKU, tag…')) ?>" value="<?= e($filters['q']) ?>">
     <select name="status"><option value=""><?= e(__('Tutti gli stati')) ?></option><option value="active" <?= $filters['status'] === 'active' ? 'selected' : '' ?>><?= e(__('Attivi')) ?></option><option value="draft" <?= $filters['status'] === 'draft' ? 'selected' : '' ?>><?= e(__('Bozze')) ?></option></select>
+    <select name="stock"><option value=""><?= e(__('Tutte le scorte')) ?></option><option value="low" <?= ($_GET['stock'] ?? '') === 'low' ? 'selected' : '' ?>><?= e(__('In esaurimento')) ?></option><option value="out" <?= ($_GET['stock'] ?? '') === 'out' ? 'selected' : '' ?>><?= e(__('Esauriti')) ?></option></select>
     <select name="category"><option value="0"><?= e(__('Tutte le categorie')) ?></option><?php foreach ($categories as $id => $name): ?><option value="<?= $id ?>" <?= (int)$filters['category_id'] === $id ? 'selected' : '' ?>><?= e($name) ?></option><?php endforeach ?></select>
     <button class="btn sec" type="submit"><?= e(__('Filtra')) ?></button>
   </form>
@@ -21,7 +22,7 @@
         <td class="nowrap"><?= (int)$p['price_min'] !== (int)$p['price_max'] ? e(money($p['price_min'])) . ' – ' . e(money($p['price_max'])) : e(money($p['price_min'])) ?></td>
       </tr>
     <?php endforeach ?>
-    <?php if (!$result['items']): ?><tr><td colspan="6" class="muted"><?= e(__('Nessun prodotto trovato.')) ?></td></tr><?php endif ?>
+    <?php if (!$result['items']): ?><tr><td colspan="6"><?= a_empty('📦', __('Nessun prodotto'), __('Aggiungi il primo prodotto o importa il tuo catalogo da WooCommerce / Shopify.'), 'admin/products/new', __('Aggiungi prodotto')) ?></td></tr><?php endif ?>
     </tbody>
   </table>
   <div class="toolbar" style="padding:14px"><select name="action"><option value="publish"><?= e(__('Pubblica')) ?></option><option value="draft"><?= e(__('Metti in bozza')) ?></option><option value="delete"><?= e(__('Elimina')) ?></option></select><button class="btn sec sm" type="submit"><?= e(__('Applica ai selezionati')) ?></button>

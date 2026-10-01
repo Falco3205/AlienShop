@@ -13,7 +13,7 @@ final class ShippingController extends AdminController
     public function index(): Response
     {
         return $this->view('shipping/index', [
-            'title' => __('Metodi di spedizione'),
+            'title' => __('Metodi di spedizione'), 'subtitle' => __('Quanto costa spedire e quando è gratis'),
             'actions' => '<a class="btn" href="' . e(url('admin/shipping/new')) . '">+ ' . e(__('Nuovo metodo')) . '</a>',
             'rows' => DB::all('SELECT * FROM shipping_methods ORDER BY position, id'),
         ], 'shipping');
@@ -38,6 +38,7 @@ final class ShippingController extends AdminController
                 'position' => $req->int('position'),
                 'active' => $req->str('active') === '1' ? 1 : 0,
             ];
+            \Alien\Core\Settings::set('onboard_shipping', 1);
             $id ? DB::update('shipping_methods', $row, 'id = ?', [$id]) : DB::insert('shipping_methods', $row);
             return $this->back('admin/shipping', __('Metodo salvato.'));
         }

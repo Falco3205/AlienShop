@@ -15,6 +15,24 @@ use Alien\Services\Shipping;
 
 final class SettingsController extends AdminController
 {
+    public function hub(): Response
+    {
+        $cards = [
+            ['admin/settings/general', '🏪', __('Dati del negozio'), __('Nome, valuta, lingua, tasse e numerazione ordini.')],
+            ['admin/payments', '💳', __('Pagamenti'), __('Stripe, PayPal, bonifico e contrassegno.')],
+            ['admin/shipping', '🚚', __('Spedizioni'), __('Metodi, prezzi e spedizione gratuita.')],
+            ['admin/settings/mail', '✉️', __('Email'), __('Mittente e server SMTP per le notifiche.')],
+            ['admin/settings/seo', '🔍', __('SEO e Google'), __('Titoli, sitemap, Search Console, Bing.')],
+            ['admin/legal', '⚖️', __('Pagine legali'), __('Privacy, cookie, termini, resi: procedura guidata gratuita.')],
+            ['admin/analytics', '📊', __('Google Analytics'), __('Collega le statistiche con una procedura guidata.')],
+            ['admin/redirects', '↪️', __('Redirect e 404'), __('Mantieni il posizionamento quando cambiano gli URL.')],
+            ['admin/import', '📦', __('Import / Export'), __('Da e verso WooCommerce e Shopify.')],
+            ['admin/themes', '🎨', __('Aspetto e temi'), __('10 temi, colori, logo e home page.')],
+            ['admin/profile', '👤', __('Il mio profilo'), __('Email e password di accesso.')],
+        ];
+        return $this->view('settings/hub', ['title' => __('Impostazioni'), 'subtitle' => __('Tutto quello che puoi configurare, in un posto solo'), 'cards' => $cards], 'settings');
+    }
+
     public function general(Request $req): Response
     {
         $groups = [
@@ -58,12 +76,13 @@ final class SettingsController extends AdminController
                 ['robots_extra', __('Righe extra per robots.txt'), 'textarea'],
             ],
             __('Analytics e codice personalizzato') => [
-                ['analytics_id', __('ID Google Analytics 4 (G-XXXXXXX)'), 'text'],
                 ['head_code', __('Codice nell\'<head>'), 'textarea'],
                 ['footer_code', __('Codice a fine pagina'), 'textarea'],
             ],
         ];
-        $info = '<div class="card"><h2>' . e(__('URL utili')) . '</h2><ul><li>Sitemap: <a href="' . e(url('sitemap.xml')) . '" target="_blank">' . e(url('sitemap.xml')) . '</a> — '
+        $ga = \Alien\Services\Analytics::id();
+        $info = '<div class="card"><h2>Google Analytics</h2><p>' . ($ga !== '' ? '✓ ' . e(__('Collegato')) . ' <code>' . e($ga) . '</code>' : e(__('Non ancora collegato.'))) . ' <a class="btn sec sm" href="' . e(url('admin/analytics')) . '">' . e($ga !== '' ? __('Gestisci') : __('Collega con la procedura guidata')) . '</a></p></div>'
+            . '<div class="card"><h2>' . e(__('URL utili')) . '</h2><ul><li>Sitemap: <a href="' . e(url('sitemap.xml')) . '" target="_blank">' . e(url('sitemap.xml')) . '</a> — '
             . e(__('inviala a Google Search Console e Bing Webmaster Tools.')) . '</li><li>robots.txt: <a href="' . e(url('robots.txt')) . '" target="_blank">' . e(url('robots.txt')) . '</a></li>'
             . '<li>Google Merchant feed: <a href="' . e(url('feeds/google.xml')) . '" target="_blank">' . e(url('feeds/google.xml')) . '</a></li>'
             . '<li>IndexNow key: <code>' . e(IndexNow::key()) . '</code></li></ul></div>';
@@ -114,7 +133,7 @@ final class SettingsController extends AdminController
             $this->persist($groups, $req);
             return $this->back($req->path, __('Impostazioni salvate.'));
         }
-        return $this->view('settings/form', ['title' => $title, 'tab' => $tab, 'groups' => $groups, 'extra' => $extra], $tab === 'payments' ? 'payments' : 'settings');
+        return $this->view('settings/form', ['title' => $title, 'subtitle' => $tab === 'payments' ? __('Scegli come i clienti possono pagarti') : '', 'tab' => $tab, 'groups' => $groups, 'extra' => $extra], match ($tab) { 'payments' => 'payments', 'seo' => 'seo', default => 'settings' });
     }
 
     private function persist(array $groups, Request $req): void
