@@ -780,6 +780,50 @@ t('aggiornamento: controllo versione da GitHub, webhook firmato', function () {
     eq(Alien\Services\Updater::verifySignature($body . ' ', $sig, 'segreto'), false);
     eq(Alien\Services\Updater::verifySignature($body, $sig, ''), false);
 });
+out("Hub e proxy\n");
+t('HubSign: firma, finestra temporale, manomissione', function () {
+    $h = Alien\Core\HubSign::headers('segreto', 'POST', '/hub/update', '{"a":1}');
+    $ts = (int)substr($h[0], 13);
+    $sig = substr($h[1], 19);
+    eq(Alien\Core\HubSign::verify('segreto', 'POST', '/hub/update', '{"a":1}', (string)$ts, $sig), true);
+    eq(Alien\Core\HubSign::verify('segreto', 'POST', '/hub/update', '{"a":2}', (string)$ts, $sig), false);
+    eq(Alien\Core\HubSign::verify('segreto', 'GET', '/hub/update', '{"a":1}', (string)$ts, $sig), false);
+    eq(Alien\Core\HubSign::verify('altro', 'POST', '/hub/update', '{"a":1}', (string)$ts, $sig), false);
+    $old = $ts - 1000;
+    eq(Alien\Core\HubSign::verify('segreto', 'POST', '/hub/update', '{"a":1}', (string)$old, Alien\Core\HubSign::signature('segreto', 'POST', '/hub/update', '{"a":1}', $old)), false, 'firma scaduta');
+    eq(Alien\Core\HubSign::verify('', 'POST', '/x', '', (string)$ts, Alien\Core\HubSign::signature('', 'POST', '/x', '', $ts)), false, 'segreto vuoto');
+});
+t('proxy fidati: IP reale da X-Forwarded-For solo da proxy autorizzati', function () {
+    $mk = fn(string $remote, string $xff) => new Request('GET', '/', [], [], [], ['REMOTE_ADDR' => $remote, 'HTTP_X_FORWARDED_FOR' => $xff]);
+    eq($mk('10.0.0.5', '203.0.113.9')->ip(), '10.0.0.5', 'nessun proxy configurato');
+    $cfg = new ReflectionProperty(Alien\Core\Config::class, 'data');
+    $old = $cfg->getValue();
+    $cfg->setValue(null, ['app' => ['trusted_proxies' => ['10.0.0.0/24', '2001:db8::/32']]]);
+    eq($mk('10.0.0.5', '203.0.113.9')->ip(), '203.0.113.9');
+    eq($mk('10.0.0.5', '1.2.3.4, 203.0.113.9, 10.0.0.7')->ip(), '203.0.113.9', 'si prende il primo non fidato da destra');
+    eq($mk('198.51.100.1', '203.0.113.9')->ip(), '198.51.100.1', 'chi non è un proxy non può falsificare');
+    eq($mk('2001:db8::5', '203.0.113.9')->ip(), '203.0.113.9');
+    $cfg->setValue(null, ['app' => ['trusted_proxies' => ['*']]]);
+    eq($mk('198.51.100.1', '203.0.113.9')->ip(), '203.0.113.9');
+    $cfg->setValue(null, $old);
+});
+t('HubAgent: metriche, SSO monouso e a scadenza', function () {
+    $m = Alien\Services\HubAgent::metrics();
+    foreach (['version', 'orders_30d', 'revenue_30d', 'daily', 'to_ship', 'low_stock', 'update_available'] as $k) {
+        eq(array_key_exists($k, $m), true, $k);
+    }
+    eq(count($m['daily']), 30);
+    $t = Alien\Services\HubAgent::createSso();
+    eq(Alien\Services\HubAgent::consumeSso('sbagliato'), false);
+    $t = Alien\Services\HubAgent::createSso();
+    eq(Alien\Services\HubAgent::consumeSso($t), true);
+    eq(Alien\Services\HubAgent::consumeSso($t), false, 'monouso');
+    Settings::set('hub_sso', json_encode(['hash' => hash('sha256', 'x'), 'exp' => time() - 1]));
+    eq(Alien\Services\HubAgent::consumeSso('x'), false, 'scaduto');
+    Alien\Services\HubAgent::connect('https://hub.test/alienshop', 'segreto-lungo');
+    eq(Alien\Services\HubAgent::secret(), 'segreto-lungo');
+    eq(Alien\Services\HubAgent::configured(), true);
+});
 out("Fatturazione elettronica\n");
 use Alien\EInvoice\Fiscal;
 use Alien\EInvoice\InvoiceData;

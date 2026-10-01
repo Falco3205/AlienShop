@@ -8,6 +8,7 @@ use Alien\Controllers\AccountController;
 use Alien\Controllers\CartController;
 use Alien\Controllers\ContactController;
 use Alien\Controllers\CheckoutController;
+use Alien\Controllers\HubController;
 use Alien\Controllers\InstallController;
 use Alien\Controllers\NewsletterController;
 use Alien\Controllers\SeoController;
@@ -61,7 +62,7 @@ final class App
                 Cache::put($cacheKey, $response->body);
             }
             self::send($response);
-            if (!str_starts_with($req->path, '/webhooks/')) {
+            if (!str_starts_with($req->path, '/webhooks/') && !str_starts_with($req->path, '/hub/')) {
                 Cron::maybeRun();
             }
         } catch (\Throwable $e) {
@@ -74,7 +75,7 @@ final class App
         $router = new Router();
         self::routes($router);
         View::share('nav', self::navigation());
-        if ($req->isPost() && !str_starts_with($req->path, '/webhooks/') && !$req->sameOrigin()) {
+        if ($req->isPost() && !str_starts_with($req->path, '/webhooks/') && !str_starts_with($req->path, '/hub/') && !$req->sameOrigin()) {
             return new Response('Forbidden', 403);
         }
         $response = $router->dispatch($req);
@@ -136,6 +137,11 @@ final class App
         $r->get('/invoice/{token}', [CheckoutController::class, 'invoice']);
         $r->get('/pay/return/{gateway}', [CheckoutController::class, 'paymentReturn']);
         $r->get('/pay/cancel/{token}', [CheckoutController::class, 'paymentCancel']);
+        $r->get('/hub/ping', [HubController::class, 'ping']);
+        $r->get('/hub/stats', [HubController::class, 'stats']);
+        $r->post('/hub/update', [HubController::class, 'update']);
+        $r->post('/hub/sso', [HubController::class, 'sso']);
+        $r->get('/hub/login', [HubController::class, 'login']);
         $r->post('/webhooks/github', [WebhookController::class, 'github']);
         $r->post('/webhooks/{gateway}', [WebhookController::class, 'handle']);
 
@@ -191,7 +197,9 @@ final class App
         $rawPath = (string)parse_url($uri, PHP_URL_PATH);
         if ($req->method === 'GET' && strlen($rawPath) > 1 && str_ends_with($rawPath, '/') && !str_starts_with($req->path, '/admin')) {
             $qs = parse_url($uri, PHP_URL_QUERY);
-            return Response::redirect(rtrim(Config::baseUrl(), '/') . rtrim($rawPath, '/') . ($qs ? '?' . $qs : ''), 301);
+            $b = parse_url(Config::baseUrl());
+            $origin = ($b['scheme'] ?? 'http') . '://' . ($b['host'] ?? 'localhost') . (isset($b['port']) ? ':' . $b['port'] : '');
+            return Response::redirect($origin . rtrim($rawPath, '/') . ($qs ? '?' . $qs : ''), 301);
         }
         return null;
     }

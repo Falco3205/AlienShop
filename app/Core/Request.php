@@ -82,7 +82,48 @@ final class Request
 
     public function ip(): string
     {
-        return $this->server['REMOTE_ADDR'] ?? '0.0.0.0';
+        $remote = (string)($this->server['REMOTE_ADDR'] ?? '0.0.0.0');
+        $trusted = (array)Config::get('app.trusted_proxies', []);
+        if (!$trusted || !self::inRanges($remote, $trusted)) {
+            return $remote;
+        }
+        $chain = array_map('trim', explode(',', (string)($this->server['HTTP_X_FORWARDED_FOR'] ?? '')));
+        foreach (array_reverse(array_filter($chain)) as $hop) {
+            if (filter_var($hop, FILTER_VALIDATE_IP) && !self::inRanges($hop, $trusted)) {
+                return $hop;
+            }
+        }
+        $first = reset($chain);
+        return $first !== false && filter_var($first, FILTER_VALIDATE_IP) ? $first : $remote;
+    }
+
+    public static function inRanges(string $ip, array $ranges): bool
+    {
+        $bin = @inet_pton($ip);
+        if ($bin === false) {
+            return false;
+        }
+        foreach ($ranges as $range) {
+            $range = trim((string)$range);
+            if ($range === '*') {
+                return true;
+            }
+            [$net, $bits] = array_pad(explode('/', $range, 2), 2, null);
+            $netBin = @inet_pton((string)$net);
+            if ($netBin === false || strlen($netBin) !== strlen($bin)) {
+                continue;
+            }
+            $bits = $bits === null ? strlen($bin) * 8 : max(0, min(strlen($bin) * 8, (int)$bits));
+            $bytes = intdiv($bits, 8);
+            if (substr($bin, 0, $bytes) !== substr($netBin, 0, $bytes)) {
+                continue;
+            }
+            $rest = $bits % 8;
+            if ($rest === 0 || (ord($bin[$bytes]) >> (8 - $rest)) === (ord($netBin[$bytes]) >> (8 - $rest))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public function header(string $name): string

@@ -50,6 +50,16 @@ if (($argv[1] ?? '') === 'install') {
         exit(1);
     }
     Alien\Services\Installer::install($data);
+    $proxies = array_values(array_filter(array_map('trim', explode(',', $env('trusted-proxies')))));
+    if ($proxies) {
+        $cfg = Config::all();
+        $cfg['app']['trusted_proxies'] = $proxies;
+        Config::write($cfg);
+    }
+    if ($env('hub-secret') !== '') {
+        DB::boot();
+        Alien\Services\HubAgent::connect($env('hub-url'), $env('hub-secret'));
+    }
     echo "AlienShop installato. Pannello: " . rtrim($data['app_url'] ?: Config::baseUrl(), '/') . "/admin\n";
     exit(0);
 }
@@ -157,6 +167,15 @@ switch ($command) {
         echo $r['message'] . "\n";
         exit($r['ok'] ? 0 : 1);
 
+    case 'hub:connect':
+        if (!isset($args[0], $args[1])) {
+            fwrite(STDERR, "Uso: console hub:connect <url-hub> <secret>\n");
+            exit(1);
+        }
+        Alien\Services\HubAgent::connect($args[0], $args[1]);
+        echo "Collegato all'hub.\n";
+        exit(0);
+
     case 'migrate':
         Alien\Services\Migrator::run();
         echo "Database aggiornato.\n";
@@ -170,7 +189,7 @@ switch ($command) {
 
     default:
         echo "AlienShop " . ALIEN_VERSION . "\n\nComandi:\n"
-            . "  install --url=https://dominio --admin-email=.. --admin-password=.. [--db=mysql --db-name=.. --db-user=.. --db-pass=..] [--store-name=..] [--theme=aurora] [--demo=1]\n"
+            . "  install --url=https://dominio --admin-email=.. --admin-password=.. [--db=mysql --db-name=.. --db-user=.. --db-pass=..] [--store-name=..] [--theme=aurora] [--demo=1] [--trusted-proxies=ip,cidr] [--hub-url=.. --hub-secret=..]\n"
             . "  import:woocommerce <file.csv> [--no-images] [--no-update]\n"
             . "  import:shopify <file.csv> [--no-images] [--no-update]\n"
             . "  export:woocommerce [file.csv]\n  export:shopify [file.csv]\n"
