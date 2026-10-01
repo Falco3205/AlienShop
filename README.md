@@ -58,6 +58,48 @@ php bin/console update:rollback    # torna alla versione precedente
 - Repository privato: inserisci un token GitHub con accesso in sola lettura. Il sito, in Git, usa invece le credenziali del `git remote`.
 - Il server web deve poter scrivere nei file del sito (su Hestia/XAMPP è già così). Su un VPS con file di proprietà di un altro utente, esegui `update` da CLI con quell'utente.
 
+## Installazione per tipo di hosting
+
+Regole comuni: PHP **8.1+** con le estensioni `pdo_sqlite` o `pdo_mysql`, `mbstring`, `gd`, `curl`, `openssl`, `sodium`, `dom` (e `zip`, `intl` consigliate), HTTPS attivo, e il document root sul dominio. Il wizard `/install` segnala cosa manca. Le procedure sotto sono indicative: i nomi dei menu cambiano tra versioni dei pannelli e non sono state provate su ciascuno.
+
+### Hestia Control Panel
+Installazione completamente automatica: vedi la sezione "Hestia Control Panel" qui sopra (`docs/hestia/install-alienshop.sh`).
+
+### cPanel
+1. **PHP**: *Select PHP Version* (o *MultiPHP Manager*) → scegli 8.1+ e attiva le estensioni elencate sopra.
+2. **File**, due strade:
+   - *Con Git*: *Git™ Version Control* → *Create* → clone URL `https://github.com/Falco3205/AlienShop.git`, percorso `public_html/alienshop` (o la cartella del dominio). Gli aggiornamenti si fanno poi da *Admin → Aggiornamenti* o con *Update from Remote*.
+   - *Senza Git*: scarica lo ZIP da GitHub (*Code → Download ZIP*), caricalo con *File Manager* nella cartella del dominio e usa *Extract*; sposta il contenuto della cartella `AlienShop-main` nella cartella del dominio.
+3. **Document root**: la soluzione migliore è puntare il dominio a `.../alienshop/public` (*Domains → Manage → Document Root*). Se non puoi cambiarlo, lascia i file nella radice del dominio: il `.htaccess` incluso instrada tutto verso `public/` e blocca `app/`, `config/`, `storage/`.
+4. **Database** (facoltativo, altrimenti SQLite): *MySQL® Database Wizard* → crea database e utente con tutti i privilegi. Nel wizard di AlienShop: host `localhost`, nome e utente completi (con il prefisso dell'account, es. `account_shop`).
+5. Apri `https://tuodominio/install`. Poi *Cron Jobs* (facoltativo): `* * * * * /usr/local/bin/php /home/ACCOUNT/public_html/alienshop/bin/console cron:run`.
+
+### Plesk
+1. *Websites & Domains → PHP Settings*: versione 8.1+ ed estensioni.
+2. *Git*: *Add Repository* → URL del repository, cartella nel dominio; oppure *File Manager* con lo ZIP come per cPanel.
+3. *Hosting Settings → Document root*: imposta `alienshop/public`.
+4. *Databases → Add Database* (facoltativo). Poi `/install`. Cron: *Scheduled Tasks → Run a PHP script* con `bin/console` e argomento `cron:run`.
+
+### DirectAdmin
+*PHP Version Selector* per versione ed estensioni; carica lo ZIP con *File Manager* (o via SSH `git clone`); *Domain Setup* per il document root su `public`; *MySQL Management* per il database; poi `/install`.
+
+### CloudPanel, aaPanel, CyberPanel e simili (VPS)
+Hanno tutti il document root configurabile e PHP-FPM: crea un sito PHP 8.1+ con root su `.../public`, esegui `git clone https://github.com/Falco3205/AlienShop.git` nella cartella del sito (come utente del sito, così gli aggiornamenti da pannello possono scrivere), crea il database dal pannello e apri `/install`. Con Nginx usa le regole di `docs/nginx.conf` (`try_files $uri /index.php?$query_string;`); con OpenLiteSpeed/Apache basta il `.htaccess` incluso.
+
+### Hosting condiviso con solo FTP
+Scompatta lo ZIP in locale, carica tutto via FTP nella cartella del dominio (con il `.htaccess` incluso funziona anche dalla radice) e apri `/install`. Scegli SQLite se l'hosting non offre MySQL. Per gli aggiornamenti usa *Admin → Aggiornamenti* (metodo ZIP, serve l'estensione `zip`) oppure ricarica i file da FTP.
+
+### XAMPP / MAMP / Laragon (test in locale)
+Clona il repository in `htdocs` e crea un virtual host che punta a `public/` (non usare una sottocartella tipo `localhost/alienshop`). Con Laragon basta mettere la cartella in `www`: crea da solo `alienshop.test`. Abilita le estensioni in `php.ini`, scegli SQLite nel wizard e imposta le email su "Solo log" (*Admin → Impostazioni → Email*), perché `mail()` in locale non invia.
+
+### Docker
+Non è incluso un `Dockerfile`: l'applicazione non ha dipendenze, quindi basta un'immagine `php:8.3-apache` con le estensioni `gd`, `intl`, `zip`, `pdo_mysql`, `sodium` e `DocumentRoot` su `public/`.
+
+### Dopo l'installazione, su qualunque pannello
+- Imposta le email (SMTP) in *Admin → Impostazioni → Email* e prova l'invio.
+- Attiva HTTPS e verifica che l'indirizzo del sito nelle impostazioni sia quello `https://`.
+- Se `config/config.php` o `storage/` non risultano scrivibili, dai i permessi all'utente PHP (`chmod -R u+rwX storage config public/uploads`).
+
 ## Installazione su VPS da GitHub (Ubuntu/Debian + Nginx)
 
 Comandi da eseguire sul server come utente con `sudo`. Sostituisci `shop.example.com` con il tuo dominio.
