@@ -19,6 +19,41 @@ use Alien\Import\WooImporter;
 use Alien\Services\Orders;
 use Alien\Services\Themes;
 
+if (($argv[1] ?? '') === 'install') {
+    $o = [];
+    foreach (array_slice($argv, 2) as $a) {
+        if (preg_match('/^--([a-z0-9-]+)(?:=(.*))?$/s', $a, $m)) {
+            $o[$m[1]] = $m[2] ?? '1';
+        }
+    }
+    $env = static fn(string $k, string $default = '') => $o[$k] ?? (getenv('ALIEN_' . strtoupper(str_replace('-', '_', $k))) ?: $default);
+    if (Config::installed()) {
+        fwrite(STDERR, "AlienShop è già installato.\n");
+        exit(1);
+    }
+    $data = [
+        'db_driver' => $env('db', 'sqlite'),
+        'db_host' => $env('db-host', 'localhost'), 'db_port' => $env('db-port', '3306'),
+        'db_name' => $env('db-name'), 'db_user' => $env('db-user'), 'db_pass' => $env('db-pass'),
+        'app_url' => $env('url'), 'store_name' => $env('store-name', 'AlienShop'),
+        'store_email' => $env('store-email', $env('admin-email')),
+        'store_tagline' => $env('tagline'), 'lang' => $env('lang', 'it'), 'currency' => $env('currency', 'EUR'),
+        'country' => $env('country', 'IT'), 'tax_rate' => $env('tax-rate', '22'), 'prices_include_tax' => $env('prices-include-tax', '1'),
+        'admin_name' => $env('admin-name', 'Admin'), 'admin_email' => $env('admin-email'),
+        'admin_password' => $env('admin-password'), 'admin_password2' => $env('admin-password'),
+        'theme' => $env('theme', 'aurora'), 'demo' => $env('demo', '0') === '1' ? 1 : 0,
+    ];
+    $_SERVER['HTTP_HOST'] = $_SERVER['HTTP_HOST'] ?? (parse_url($data['app_url'], PHP_URL_HOST) ?: 'localhost');
+    $errors = Alien\Services\Installer::validate($data);
+    if ($errors) {
+        fwrite(STDERR, "Installazione non riuscita:\n - " . implode("\n - ", $errors) . "\n");
+        exit(1);
+    }
+    Alien\Services\Installer::install($data);
+    echo "AlienShop installato. Pannello: " . rtrim($data['app_url'] ?: Config::baseUrl(), '/') . "/admin\n";
+    exit(0);
+}
+
 if (!Config::installed()) {
     fwrite(STDERR, "AlienShop non è installato. Apri /install nel browser.\n");
     exit(1);
@@ -112,6 +147,7 @@ switch ($command) {
 
     default:
         echo "AlienShop " . ALIEN_VERSION . "\n\nComandi:\n"
+            . "  install --url=https://dominio --admin-email=.. --admin-password=.. [--db=mysql --db-name=.. --db-user=.. --db-pass=..] [--store-name=..] [--theme=aurora] [--demo=1]\n"
             . "  import:woocommerce <file.csv> [--no-images] [--no-update]\n"
             . "  import:shopify <file.csv> [--no-images] [--no-update]\n"
             . "  export:woocommerce [file.csv]\n  export:shopify [file.csv]\n"

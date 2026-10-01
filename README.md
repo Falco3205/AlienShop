@@ -17,6 +17,31 @@ PHP 8.1+ con `pdo_sqlite` **o** `pdo_mysql`, `mbstring`, `gd` (con WebP), `curl`
 
 Dopo l'installazione `/install` non è più raggiungibile (`storage/installed.lock`).
 
+## Installazione automatica (riga di comando) e Hestia Control Panel
+
+Il wizard ha un equivalente non interattivo, utile per script e pannelli:
+
+```bash
+php bin/console install --url=https://shop.example.com --admin-email=tu@example.com \
+  --store-name="Il mio negozio" --theme=aurora --demo=0 \
+  --db=mysql --db-host=localhost --db-name=alienshop --db-user=alienshop
+# password e segreti via variabili d'ambiente (non restano nella cronologia dei comandi):
+ALIEN_ADMIN_PASSWORD='password-lunga' ALIEN_DB_PASS='password-db' php bin/console install ...
+```
+
+Senza `--db=mysql` usa SQLite. Altre opzioni: `--lang=it|en`, `--currency=EUR`, `--country=IT`, `--tax-rate=22`, `--prices-include-tax=1`, `--tagline`, `--store-email`, `--admin-name`.
+
+### Hestia Control Panel
+
+`docs/hestia/install-alienshop.sh` automatizza tutto su un server con Hestia (come root): crea il dominio web se manca, scarica AlienShop da GitHub nella cartella del sito, crea il database MySQL, imposta un template Nginx con document root su `public/`, blocca l'esecuzione di PHP in `uploads/`, emette il certificato Let's Encrypt, esegue `bin/console install` e aggiunge il cron.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Falco3205/AlienShop/main/docs/hestia/install-alienshop.sh -o install-alienshop.sh
+sudo bash install-alienshop.sh UTENTE_HESTIA shop.example.com tu@example.com "Il mio negozio"
+```
+
+La password dell'amministratore viene generata e stampata a fine installazione (oppure imposti `ALIEN_ADMIN_PASSWORD`). Il dominio deve già puntare al server per il certificato; con `SKIP_SSL=1` salti HTTPS. Lo script si ferma se la cartella del sito contiene già dei file. È pensato per Hestia con Nginx + PHP-FPM e PHP 8.1+ come CLI predefinito; lo script non è stato provato su un server Hestia reale, quindi al primo uso controlla l'output.
+
 ## Installazione su VPS da GitHub (Ubuntu/Debian + Nginx)
 
 Comandi da eseguire sul server come utente con `sudo`. Sostituisci `shop.example.com` con il tuo dominio.
