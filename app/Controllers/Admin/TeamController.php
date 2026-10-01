@@ -50,7 +50,7 @@ final class TeamController extends AdminController
     {
         $u = DB::row("SELECT * FROM users WHERE id = ? AND role = 'admin'", [(int)$params['id']]);
         if ($u) {
-            Mailer::send($u['email'], __('Reimposta la tua password'), '<p><a href="' . e(url('account/reset/' . Auth::resetToken($u))) . '">' . e(__('Scegli una nuova password')) . '</a></p>');
+            \Alien\Services\Notifications::passwordReset($u, url('account/reset/' . Auth::resetToken($u)));
         }
         return $this->back('admin/team', __('Link di reimpostazione inviato.'));
     }

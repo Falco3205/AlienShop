@@ -1281,4 +1281,126 @@ return [
     'Il tuo ordine è stato annullato.' => 'Your order has been cancelled.',
     'Ordine %s rimborsato' => 'Order %s refunded',
     'Ordine %s annullato' => 'Order %s cancelled',
+    'Email ai clienti' => 'Customer emails',
+    'Personalizza i messaggi automatici del tuo negozio' => 'Customise your shop\'s automatic messages',
+    'Inviata al cliente quando l\'ordine è confermato.' => 'Sent to the customer when the order is confirmed.',
+    'Conferma ordine {order_number}' => 'Order confirmation {order_number}',
+    'Grazie per il tuo ordine, {customer_name}!
+
+Abbiamo ricevuto il tuo ordine {order_number} e lo stiamo preparando.
+
+{order_details}
+
+{order_link}' => 'Thank you for your order, {customer_name}!
+
+We received your order {order_number} and we are preparing it.
+
+{order_details}
+
+{order_link}',
+    'Nuovo ordine (per te)' => 'New order (for you)',
+    'Inviata all\'email del negozio quando arriva un ordine.' => 'Sent to the shop email when an order arrives.',
+    'Nuovo ordine {order_number} — {order_total}' => 'New order {order_number} — {order_total}',
+    'Hai ricevuto un nuovo ordine da {customer_name} ({customer_email}).
+
+{order_details}
+
+{admin_link}' => 'You received a new order from {customer_name} ({customer_email}).
+
+{order_details}
+
+{admin_link}',
+    'Ordine spedito' => 'Order shipped',
+    'Inviata al cliente quando segni l\'ordine come spedito.' => 'Sent to the customer when you mark the order as shipped.',
+    'Il tuo ordine {order_number} è stato spedito' => 'Your order {order_number} has shipped',
+    'Ciao {customer_name}, il tuo ordine è in viaggio!
+
+Codice di tracciamento: {tracking}
+
+{order_details}
+
+{order_link}' => 'Hi {customer_name}, your order is on its way!
+
+Tracking code: {tracking}
+
+{order_details}
+
+{order_link}',
+    'Ordine annullato' => 'Order cancelled',
+    'Inviata al cliente quando annulli un ordine.' => 'Sent to the customer when you cancel an order.',
+    'Ordine {order_number} annullato' => 'Order {order_number} cancelled',
+    'Ciao {customer_name}, il tuo ordine {order_number} è stato annullato.
+
+Se hai domande scrivici: siamo a tua disposizione.
+
+{order_details}' => 'Hi {customer_name}, your order {order_number} has been cancelled.
+
+If you have questions, write to us: we are happy to help.
+
+{order_details}',
+    'Ordine rimborsato' => 'Order refunded',
+    'Inviata al cliente quando rimborsi un ordine.' => 'Sent to the customer when you refund an order.',
+    'Ordine {order_number} rimborsato' => 'Order {order_number} refunded',
+    'Ciao {customer_name}, abbiamo rimborsato il tuo ordine {order_number} di {order_total}.
+
+I tempi di accredito dipendono dal tuo metodo di pagamento.
+
+{order_details}' => 'Hi {customer_name}, we refunded your order {order_number} of {order_total}.
+
+Credit times depend on your payment method.
+
+{order_details}',
+    'Benvenuto' => 'Welcome',
+    'Inviata quando un cliente crea un account.' => 'Sent when a customer creates an account.',
+    'Benvenuto su {store_name}' => 'Welcome to {store_name}',
+    'Ciao {customer_name},
+
+il tuo account è stato creato. Ora puoi seguire i tuoi ordini e acquistare più velocemente.
+
+{account_link}' => 'Hi {customer_name},
+
+your account has been created. You can now follow your orders and check out faster.
+
+{account_link}',
+    'Inviata quando qualcuno chiede di reimpostare la password.' => 'Sent when someone asks to reset their password.',
+    'Hai richiesto di reimpostare la password di {store_name}.
+
+{reset_link}
+
+Il link è valido per un\'ora. Se non sei stato tu, ignora questa email.' => 'You asked to reset your {store_name} password.
+
+{reset_link}
+
+The link is valid for one hour. If it was not you, ignore this email.',
+    'Nome del cliente' => 'Customer name',
+    'Email del cliente' => 'Customer email',
+    'Totale ordine' => 'Order total',
+    'Codice di tracciamento' => 'Tracking code',
+    'Tabella con prodotti, totali e indirizzo' => 'Table with products, totals and address',
+    'Pulsante "Vedi il tuo ordine"' => '"View your order" button',
+    'Pulsante per aprire l\'ordine in admin' => 'Button to open the order in admin',
+    'Pulsante "Vai al tuo account"' => '"Go to your account" button',
+    'Pulsante "Scegli una nuova password"' => '"Choose a new password" button',
+    'Prodotto di esempio' => 'Sample product',
+    'Altro prodotto' => 'Another product',
+    'Apri l\'ordine' => 'Open the order',
+    'Aspetto delle email salvato.' => 'Email appearance saved.',
+    'Email non trovata.' => 'Email not found.',
+    'Email salvata.' => 'Email saved.',
+    'Ripristinato il testo originale.' => 'Original text restored.',
+    'Email di prova inviata a %s.' => 'Test email sent to %s.',
+    'Disattivata' => 'Disabled',
+    'Personalizzata' => 'Customised',
+    'Modifica' => 'Edit',
+    'Aspetto di tutte le email' => 'Appearance of all emails',
+    'Colore principale' => 'Main colour',
+    'Testo a piè di pagina' => 'Footer text',
+    'Per esempio ragione sociale, indirizzo, contatti. Se vuoto compare il nome del negozio.' => 'For example company name, address, contacts. If empty the shop name is shown.',
+    'Il logo è quello impostato in "Aspetto e temi".' => 'The logo is the one set in "Appearance and themes".',
+    'Tutte le email' => 'All emails',
+    'Invia questa email' => 'Send this email',
+    'Lascia una riga vuota per iniziare un nuovo paragrafo.' => 'Leave a blank line to start a new paragraph.',
+    'Segnaposto (clicca per inserirli)' => 'Placeholders (click to insert)',
+    'Tornare al testo originale?' => 'Go back to the original text?',
+    'Ripristina il testo originale' => 'Restore original text',
 ];

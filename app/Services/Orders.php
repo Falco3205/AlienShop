@@ -193,26 +193,21 @@ final class Orders
                 self::event($id, $res['ok'] ? __('Nota di credito %s emessa.', $res['invoice']['number']) : __('Nota di credito non emessa: %s', implode(' ', $res['errors'])));
             }
         }
-        if (in_array($status, ['cancelled', 'refunded'], true) && $restock && $o['email']) {
-            $intro = $status === 'refunded' ? __('Il tuo ordine è stato rimborsato.') : __('Il tuo ordine è stato annullato.');
-            Mailer::send($o['email'], ($status === 'refunded' ? __('Ordine %s rimborsato', $o['number']) : __('Ordine %s annullato', $o['number'])), self::emailHtml(self::find($id), $intro));
-        }
-        if ($status === 'shipped' && $o['email']) {
-            Mailer::send($o['email'], __('Il tuo ordine %s è stato spedito', $o['number']), self::emailHtml(self::find($id), __('Il tuo ordine è in viaggio!')));
+        $template = ['shipped' => 'order_shipped', 'cancelled' => 'order_cancelled', 'refunded' => 'order_refunded'][$status] ?? null;
+        $notifyStatus = $status === 'shipped' ? $o['status'] !== 'shipped' : $restock;
+        if ($template && $notifyStatus && $o['email']) {
+            EmailTemplates::send($template, (string)$o['email'], EmailTemplates::orderVars(self::find($id)));
         }
     }
 
     public static function notify(array $order): void
     {
-        $subject = __('Conferma ordine %s', $order['number']);
-        Mailer::send($order['email'], $subject, self::emailHtml($order, __('Grazie per il tuo ordine!')));
-        $admin = (string)Settings::get('store_email', '');
-        if ($admin !== '') {
-            Mailer::send($admin, __('Nuovo ordine %s', $order['number']) . ' — ' . Money::format((int)$order['total'], $order['currency']), self::emailHtml($order, __('Hai ricevuto un nuovo ordine.')));
-        }
+        $vars = EmailTemplates::orderVars($order);
+        EmailTemplates::send('order_confirmation', (string)$order['email'], $vars);
+        EmailTemplates::send('order_admin', (string)Settings::get('store_email', ''), $vars);
     }
 
-    public static function emailHtml(array $o, string $intro): string
+    public static function detailsHtml(array $o): string
     {
         $rows = '';
         foreach ($o['items'] as $it) {
@@ -222,18 +217,14 @@ final class Orders
         $line = static fn(string $l, int $v) => $v ? '<tr><td>' . e($l) . '</td><td style="text-align:right">' . e(Money::format($v, $o['currency'])) . '</td></tr>' : '';
         $ship = $o['shipping_address'];
         $addr = e(trim(($ship['name'] ?? '') . ', ' . ($ship['address'] ?? '') . ', ' . ($ship['zip'] ?? '') . ' ' . ($ship['city'] ?? '') . ' ' . ($ship['country'] ?? ''), ' ,'));
-        $store = e(Settings::get('store_name', 'Shop'));
-        $link = Config::baseUrl() . '/checkout/thank-you/' . $o['token'];
-        return '<div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;color:#222"><h2>' . $store . '</h2><p>' . e($intro) . '</p>'
-            . '<p><strong>' . e(__('Ordine')) . ' ' . e($o['number']) . '</strong></p>'
+        return '<p style="margin:0 0 8px"><strong>' . e(__('Ordine')) . ' ' . e($o['number']) . '</strong></p>'
             . '<table width="100%" cellspacing="0" style="border-top:1px solid #ddd;border-bottom:1px solid #ddd">' . $rows . '</table>'
-            . '<table width="100%" cellspacing="0" style="margin-top:10px">'
+            . '<table width="100%" cellspacing="0" style="margin:10px 0">'
             . $line(__('Subtotale'), (int)$o['subtotal']) . $line(__('Sconto'), -(int)$o['discount']) . $line(__('Spedizione'), (int)$o['shipping'])
             . '<tr><td><strong>' . e(__('Totale')) . '</strong></td><td style="text-align:right"><strong>' . e(Money::format((int)$o['total'], $o['currency'])) . '</strong></td></tr></table>'
-            . '<p>' . e(__('Spedizione a')) . ': ' . $addr . '</p>'
-            . '<p>' . e(__('Pagamento')) . ': ' . e($o['payment_method']) . ' — ' . e(__(self::PAYMENT_STATUSES[$o['payment_status']] ?? $o['payment_status'])) . '</p>'
-            . ($o['tracking'] ? '<p>' . e(__('Tracking')) . ': ' . e($o['tracking']) . '</p>' : '')
-            . '<p><a href="' . e($link) . '">' . e(__('Vedi il tuo ordine')) . '</a></p></div>';
+            . '<p style="margin:0 0 8px">' . e(__('Spedizione a')) . ': ' . $addr . '</p>'
+            . '<p style="margin:0 0 16px">' . e(__('Pagamento')) . ': ' . e($o['payment_method']) . ' — ' . e(__(self::PAYMENT_STATUSES[$o['payment_status']] ?? $o['payment_status'])) . '</p>'
+            . ($o['tracking'] ? '<p style="margin:0 0 16px">' . e(__('Tracking')) . ': ' . e($o['tracking']) . '</p>' : '');
     }
 
     public static function forUser(int $userId): array

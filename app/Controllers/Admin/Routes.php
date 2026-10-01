@@ -93,6 +93,12 @@ final class Routes
         $add('GET', '/admin/invoices/export', InvoicesController::class, 'export');
         $add('GET', '/admin/orders/{id}/invoice', InvoicesController::class, 'download');
         $add('POST', '/admin/orders/{id}/invoice/send', InvoicesController::class, 'send');
+        $add('GET', '/admin/emails', EmailsController::class, 'index');
+        $add('POST', '/admin/emails/design', EmailsController::class, 'design');
+        $both('/admin/emails/{id}', EmailsController::class, 'edit');
+        $add('POST', '/admin/emails/{id}/reset', EmailsController::class, 'reset');
+        $add('POST', '/admin/emails/{id}/preview', EmailsController::class, 'preview');
+        $add('POST', '/admin/emails/{id}/test', EmailsController::class, 'test');
         $add('GET', '/admin/backup', BackupController::class, 'index');
         $add('POST', '/admin/backup/download', BackupController::class, 'download');
         $add('GET', '/admin/modules', ModulesController::class, 'index');

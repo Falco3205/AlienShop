@@ -95,7 +95,7 @@ final class AccountController extends Controller
                 $user = DB::row('SELECT * FROM users WHERE email = ?', [mb_strtolower($req->str('email'))]);
                 if ($user) {
                     $link = url('account/reset/' . Auth::resetToken($user));
-                    Mailer::send($user['email'], __('Reimposta la tua password'), '<p>' . e(__('Hai richiesto di reimpostare la password di %s.', Settings::get('store_name', ''))) . '</p><p><a href="' . e($link) . '">' . e(__('Scegli una nuova password')) . '</a></p><p>' . e(__('Il link è valido per un\'ora. Se non sei stato tu, ignora questa email.')) . '</p>');
+                    \Alien\Services\Notifications::passwordReset($user, $link);
                 }
                 $data['sent'] = true;
             }

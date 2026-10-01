@@ -656,6 +656,25 @@ t('email: benvenuto e annullo ordine', function () {
     Cart::clear();
     @unlink($log);
 });
+t('email personalizzabili: segnaposto, escape, ripristino, disattivazione', function () {
+    $o = Alien\Services\EmailTemplates::sampleOrder();
+    $vars = Alien\Services\EmailTemplates::sampleVars('order_confirmation');
+    [$subject, $html] = Alien\Services\EmailTemplates::render('order_confirmation', $vars);
+    eq($subject, 'Conferma ordine ' . $o['number']);
+    eq(str_contains($html, 'Prodotto di esempio') && str_contains($html, 'Vedi il tuo ordine'), true);
+    Alien\Services\EmailTemplates::save('order_confirmation', 'Grazie {customer_name} <b>', "Ciao <script>x</script> {customer_name}\n\n{order_link}\n\n{sconosciuto}", true);
+    $vars['customer_name'] = '<i>Mario</i>';
+    [$subject, $html] = Alien\Services\EmailTemplates::render('order_confirmation', $vars);
+    eq($subject, 'Grazie <i>Mario</i> <b>');
+    eq(preg_match('/<script|<i>Mario/', $html), 0, 'html del cliente deve essere escapato');
+    eq(str_contains($html, '{sconosciuto}') && str_contains($html, '&lt;script&gt;'), true);
+    Alien\Services\EmailTemplates::reset('order_confirmation');
+    eq(Alien\Services\EmailTemplates::render('order_confirmation', $vars)[0], 'Conferma ordine ' . $o['number']);
+    Alien\Services\EmailTemplates::save('welcome', 'x', 'y', false);
+    eq(Alien\Services\EmailTemplates::send('welcome', 'a@b.it', $vars), false);
+    Alien\Services\EmailTemplates::reset('welcome');
+    eq(Alien\Services\EmailTemplates::enabled('welcome'), true);
+});
 t('ricerca: caratteri jolly LIKE neutralizzati', function () {
     eq(DB::like('50%_off!'), '%50!%!_off!!%');
 });
