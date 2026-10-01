@@ -144,6 +144,7 @@ final class Node
             'secret' => '/^[0-9a-f]{20,128}$/',
             'url' => '#^https?://[\w.\-]+(:\d+)?(/[a-z0-9_-]+)?$#',
             'upstream' => '#^https?://[\w.\-\[\]:]+$#',
+            'host' => '/^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,24}$/',
         ];
         foreach ($rules as $key => $kind) {
             if (!isset($p[$key]) || !is_string($p[$key]) || !preg_match($patterns[$kind] . 'D', $p[$key])) {
@@ -350,6 +351,12 @@ NGX;
     public function addEdge(array $p): array
     {
         $this->validate($p, ['domain' => 'domain', 'hestia_user' => 'user', 'upstream' => 'upstream']);
+        $originHost = (string)($p['origin_host'] ?? '');
+        $relaySecret = (string)($p['relay_secret'] ?? '');
+        if ($originHost !== '') {
+            $this->validate(['origin_host' => $originHost, 'relay_secret' => $relaySecret], ['origin_host' => 'host', 'relay_secret' => 'secret']);
+            $this->redact[] = $relaySecret;
+        }
         $user = $p['hestia_user'];
         $domain = $p['domain'];
         $this->say("== Pubblicazione di $domain tramite frontend");
@@ -361,7 +368,7 @@ NGX;
         if (!$this->dry) {
             @mkdir('/var/cache/nginx/alienshop', 0755, true);
         }
-        $this->write("/home/$user/conf/web/$domain/alienshop_edge.inc", $this->edgeConfig($p['upstream']));
+        $this->write("/home/$user/conf/web/$domain/alienshop_edge.inc", $this->edgeConfig($p['upstream'], $originHost, $relaySecret), 0600);
         $this->hestia('v-change-web-domain-tpl', [$user, $domain, 'alienshop-edge']);
         $this->hestia('v-add-letsencrypt-domain', [$user, $domain], false);
         $this->hestia('v-add-web-domain-ssl-force', [$user, $domain], false);
@@ -370,14 +377,15 @@ NGX;
         return ['upstream' => $p['upstream']];
     }
 
-    public function edgeConfig(string $upstream): string
+    public function edgeConfig(string $upstream, string $originHost = '', string $relaySecret = ''): string
     {
+        $tunnel = $originHost !== '' ? "    proxy_ssl_server_name on;\n    proxy_ssl_name $originHost;\n    proxy_set_header Host $originHost;\n    proxy_set_header X-Alien-Host \$host;\n    proxy_set_header X-Alien-Relay $relaySecret;" : '    proxy_set_header Host $host;';
         $common = <<<NGX
     proxy_pass $upstream;
     proxy_http_version 1.1;
-    proxy_set_header Host \$host;
+$tunnel
     proxy_set_header X-Real-IP \$remote_addr;
-    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-For \$remote_addr;
     proxy_set_header X-Forwarded-Proto \$scheme;
     proxy_set_header X-Forwarded-Host \$host;
     proxy_set_header Connection "";

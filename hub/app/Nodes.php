@@ -9,7 +9,7 @@ final class Nodes
 {
     public const ROLES = ['backend' => 'Backend (ospita i negozi)', 'edge' => 'Frontend (pubblica i negozi)'];
 
-    public static function create(string $name, string $role, string $address, string $upstream, string $hestiaUser, string $trusted = ''): array
+    public static function create(string $name, string $role, string $address, string $upstream, string $hestiaUser, string $trusted = '', string $tunnelHost = ''): array
     {
         $errors = [];
         $name = trim($name);
@@ -20,8 +20,14 @@ final class Nodes
         if (!isset(self::ROLES[$role])) {
             $errors[] = 'Ruolo non valido.';
         }
-        if ($role === 'backend' && !preg_match('#^https?://[\w.\-\[\]:]+$#D', $upstream)) {
-            $errors[] = 'Indirizzo del backend raggiungibile dal frontend non valido (es. http://10.0.0.2:80).';
+        $tunnelHost = mb_strtolower(trim($tunnelHost));
+        if ($role === 'backend' && $tunnelHost !== '') {
+            if (!preg_match('/^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,24}$/D', $tunnelHost)) {
+                $errors[] = 'Hostname del tunnel non valido (es. backend-origin.tuodominio.it).';
+            }
+            $upstream = 'https://' . $tunnelHost;
+        } elseif ($role === 'backend' && !preg_match('#^https?://[\w.\-\[\]:]+$#D', $upstream)) {
+            $errors[] = 'Indirizzo del backend raggiungibile dal frontend non valido (es. http://10.0.0.2:80), oppure indica l\'hostname del tunnel.';
         }
         $trusted = trim($trusted);
         foreach (array_filter(array_map('trim', explode(',', $trusted))) as $range) {
@@ -39,7 +45,7 @@ final class Nodes
         $token = bin2hex(random_bytes(24));
         $id = DB::insert('nodes', [
             'name' => $name, 'role' => $role, 'token_hash' => hash('sha256', $token), 'address' => trim($address),
-            'upstream' => $role === 'backend' ? $upstream : '', 'trusted' => $role === 'backend' ? $trusted : '', 'hestia_user' => $hestiaUser, 'created_at' => now(),
+            'upstream' => $role === 'backend' ? $upstream : '', 'trusted' => $role === 'backend' ? $trusted : '', 'tunnel_host' => $role === 'backend' ? $tunnelHost : '', 'relay_secret' => $role === 'backend' && $tunnelHost !== '' ? bin2hex(random_bytes(16)) : '', 'hestia_user' => $hestiaUser, 'created_at' => now(),
         ]);
         return [$id, $token, []];
     }

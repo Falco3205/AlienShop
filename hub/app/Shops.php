@@ -59,6 +59,9 @@ final class Shops
         if (!$node || $node['role'] !== 'backend') {
             $errors[] = 'Scegli un server backend.';
         }
+        if ($node && $node['tunnel_host'] !== '' && $in['mode'] !== 'edge') {
+            $errors[] = 'Questo backend è raggiungibile solo tramite il tunnel: scegli la pubblicazione tramite frontend.';
+        }
         if ($in['mode'] === 'edge') {
             $edge = Nodes::find((int)$in['edge_node_id']);
             if (!$edge || $edge['role'] !== 'edge') {
@@ -80,7 +83,13 @@ final class Shops
     private static function trustedProxies(array $backend, array $edge): array
     {
         $ranges = array_values(array_filter(array_map('trim', explode(',', (string)$backend['trusted']))));
-        return $ranges ?: ($edge['address'] ? [$edge['address']] : []);
+        if ($ranges) {
+            return $ranges;
+        }
+        if ($backend['tunnel_host'] !== '') {
+            return array_values(array_filter(['127.0.0.1', $backend['address']]));
+        }
+        return $edge['address'] ? [$edge['address']] : [];
     }
 
     public static function installPayload(array $shop, string $password): array
@@ -171,7 +180,7 @@ final class Shops
                 Jobs::queue((int)$shop['edge_node_id'], 'add_edge', [
                     'shop_id' => (int)$shop['id'], 'domain' => $shop['domain'], 'path' => $shop['path'],
                     'hestia_user' => (Nodes::find((int)$shop['edge_node_id']) ?? [])['hestia_user'] ?? '',
-                    'upstream' => $node['upstream'],
+                    'upstream' => $node['upstream'], 'origin_host' => $node['tunnel_host'], 'relay_secret' => $node['relay_secret'],
                 ], (int)$shop['id']);
                 return;
             }

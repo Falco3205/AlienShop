@@ -87,6 +87,26 @@ t('frontend: configurazione proxy, cache e certificato', function () use ($node)
     ok(substr_count($c, 'proxy_pass http://10.0.0.2:80;') === 2);
     ok(str_contains($c, 'proxy_cache_bypass $cookie_as_admin;') && str_contains($c, 'proxy_cache_use_stale') && str_contains($c, 'X-Forwarded-Proto $scheme'));
 });
+t('frontend con tunnel Cloudflare: hostname del tunnel, segreto del relay, IP reale', function () use ($node) {
+    $secret = str_repeat('ab', 16);
+    $n = $node();
+    $n->addEdge(['domain' => 'cliente.it', 'hestia_user' => 'falco3205', 'upstream' => 'https://backend-origin.falconefabio.it', 'origin_host' => 'backend-origin.falconefabio.it', 'relay_secret' => $secret]);
+    $log = implode("\n", $n->log);
+    ok(!str_contains($log, $secret), 'il segreto non deve comparire nel registro');
+    $c = $n->edgeConfig('https://backend-origin.falconefabio.it', 'backend-origin.falconefabio.it', $secret);
+    foreach (['proxy_ssl_server_name on;', 'proxy_ssl_name backend-origin.falconefabio.it;', 'proxy_set_header Host backend-origin.falconefabio.it;', 'proxy_set_header X-Alien-Host $host;', 'proxy_set_header X-Alien-Relay ' . $secret . ';', 'proxy_set_header X-Forwarded-For $remote_addr;'] as $needle) {
+        ok(substr_count($c, $needle) === 2, "manca: $needle");
+    }
+    foreach ([['origin_host' => 'x;y.it', 'relay_secret' => $secret], ['origin_host' => 'a.it', 'relay_secret' => 'zz'], ['origin_host' => "a.it\n", 'relay_secret' => $secret]] as $bad) {
+        $threw = false;
+        try {
+            $node()->addEdge($bad + ['domain' => 'cliente.it', 'hestia_user' => 'falco3205', 'upstream' => 'https://a.it']);
+        } catch (RuntimeException) {
+            $threw = true;
+        }
+        ok($threw, json_encode($bad));
+    }
+});
 t('validazione: iniezioni e parametri pericolosi rifiutati', function () use ($base, $node) {
     $bad = [
         ['domain' => 'x.it; rm -rf /', 'dominio'] , ['domain' => '../../etc'], ['hestia_user' => 'root'], ['hestia_user' => 'falco3205; id'], ['path' => '../x'], ['path' => 'a b'],

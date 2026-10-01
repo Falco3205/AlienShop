@@ -3,16 +3,18 @@
 # Uso (come root): bash install.sh --user falco3205 --domain hub.falconefabio.it --root --admin-email tu@example.com [--repo utente/repo] [--branch main]
 #   --root   installa nella radice del dominio (CONSIGLIATO: un sottodominio dedicato isola il pannello dagli altri siti)
 #   --path X installa in una sottocartella (es. falconefabio.it/alienshop)
+#   --no-ssl non emette il certificato e non forza HTTPS sul server (da usare quando il traffico arriva da un tunnel Cloudflare: HTTPS è già gestito da Cloudflare)
 # La password admin viene generata e stampata (oppure imposta HUB_ADMIN_PASSWORD).
 set -euo pipefail
 
-HUSER=""; DOMAIN=""; SUBPATH="alienshop"; PATH_SET=0; EMAIL=""; REPO="Falco3205/AlienShop"; BRANCH="main"
+HUSER=""; DOMAIN=""; SUBPATH="alienshop"; PATH_SET=0; NO_SSL=0; EMAIL=""; REPO="Falco3205/AlienShop"; BRANCH="main"
 while [ $# -gt 0 ]; do
   case "$1" in
     --user) HUSER="$2"; shift 2;;
     --domain) DOMAIN="$2"; shift 2;;
     --path) SUBPATH="$2"; PATH_SET=1; shift 2;;
     --root) SUBPATH=""; PATH_SET=1; shift;;
+    --no-ssl) NO_SSL=1; shift;;
     --admin-email) EMAIL="$2"; shift 2;;
     --repo) REPO="$2"; shift 2;;
     --branch) BRANCH="$2"; shift 2;;
@@ -64,8 +66,10 @@ if [ -z "$SUBPATH" ]; then
     grep -q '/hub/public;' "$TPL_DIR/alienshop-hub.$ext" || die "non riesco ad adattare il template di Hestia"
   done
   v-change-web-domain-tpl "$HUSER" "$DOMAIN" alienshop-hub
-  v-add-letsencrypt-domain "$HUSER" "$DOMAIN" >/dev/null 2>&1 || echo "Attenzione: certificato non emesso (DNS non ancora puntato?)."
-  v-add-web-domain-ssl-force "$HUSER" "$DOMAIN" >/dev/null 2>&1 || true
+  if [ "$NO_SSL" -eq 0 ]; then
+    v-add-letsencrypt-domain "$HUSER" "$DOMAIN" >/dev/null 2>&1 || echo "Attenzione: certificato non emesso (DNS non ancora puntato?)."
+    v-add-web-domain-ssl-force "$HUSER" "$DOMAIN" >/dev/null 2>&1 || true
+  fi
 else
 SOCK="$(grep -hE '^listen[[:space:]]*=' /etc/php/*/fpm/pool.d/$DOMAIN.conf 2>/dev/null | head -1 | sed -E 's/^listen[[:space:]]*=[[:space:]]*//' || true)"
 [ -n "$SOCK" ] || SOCK="/run/php/php-fpm-$DOMAIN.sock"

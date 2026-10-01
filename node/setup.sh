@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 # Collega una VPS con Hestia all'hub AlienShop (agente + template Hestia).
 # Uso (come root):
-#   bash setup.sh --hub https://dominio/alienshop --token TOKEN --role backend|edge --user UTENTE_HESTIA [--repo utente/repo] [--branch main] [--users u1,u2]
+#   ALIEN_NODE_TOKEN=TOKEN bash setup.sh --hub https://hub.dominio.it --role backend|edge --user UTENTE_HESTIA [--cloudflare] [--relay-secret S] [--repo utente/repo] [--branch main] [--users u1,u2]
+#   --cloudflare     legge l'IP vero dei visitatori da Cloudflare (CF-Connecting-IP) e tiene aggiornati gli intervalli di Cloudflare
+#   --relay-secret   (solo backend) attiva il relay per il tunnel cloudflared: il frontend entra con un segreto
 set -euo pipefail
 
-HUB=""; TOKEN=""; ROLE=""; HUSER=""; REPO="Falco3205/AlienShop"; BRANCH="main"; USERS=""
+HUB=""; TOKEN=""; ROLE=""; HUSER=""; REPO="Falco3205/AlienShop"; BRANCH="main"; USERS=""; CLOUDFLARE=0; RELAY_SECRET=""; RELAY_PORT="8088"
 while [ $# -gt 0 ]; do
   case "$1" in
     --hub) HUB="$2"; shift 2;;
@@ -14,6 +16,9 @@ while [ $# -gt 0 ]; do
     --repo) REPO="$2"; shift 2;;
     --branch) BRANCH="$2"; shift 2;;
     --users) USERS="$2"; shift 2;;
+    --cloudflare) CLOUDFLARE=1; shift;;
+    --relay-secret) RELAY_SECRET="$2"; shift 2;;
+    --relay-port) RELAY_PORT="$2"; shift 2;;
     *) echo "Opzione sconosciuta: $1" >&2; exit 1;;
   esac
 done
@@ -24,6 +29,7 @@ TOKEN="${TOKEN:-${ALIEN_NODE_TOKEN:-}}"
 [ -n "$HUB" ] && [ -n "$TOKEN" ] && [ -n "$HUSER" ] || die "servono --hub, il token (ALIEN_NODE_TOKEN) e --user"
 [ "$ROLE" = "backend" ] || [ "$ROLE" = "edge" ] || die "--role deve essere backend o edge"
 echo "$TOKEN" | grep -Eq '^[0-9a-f]{48}$' || die "token non valido"
+if [ -n "$RELAY_SECRET" ]; then echo "$RELAY_SECRET" | grep -Eq '^[0-9a-f]{20,128}$' || die "segreto del relay non valido"; echo "$RELAY_PORT" | grep -Eq '^[0-9]{2,5}$' || die "porta del relay non valida"; fi
 echo "$REPO" | grep -Eq '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$' || die "repository non valido"
 echo "$HUB" | grep -Eq '^https?://[A-Za-z0-9._:/-]+$' || die "indirizzo dell'hub non valido"
 HESTIA="${HESTIA:-/usr/local/hestia}"
@@ -73,6 +79,63 @@ else
   NGUSER="$(awk '/^user /{gsub(";","",$2); print $2; exit}' /etc/nginx/nginx.conf 2>/dev/null || true)"
   [ -n "$NGUSER" ] && chown -R "$NGUSER" /var/cache/nginx/alienshop || true
   echo 'proxy_cache_path /var/cache/nginx/alienshop levels=1:2 keys_zone=alienshop:50m max_size=2g inactive=7d use_temp_path=off;' > /etc/nginx/conf.d/alienshop-cache.conf
+fi
+
+nginx_reload() { if nginx -t >/dev/null 2>&1; then systemctl reload nginx >/dev/null 2>&1 || "$HESTIA/bin/v-restart-web" >/dev/null 2>&1 || true; else return 1; fi; }
+
+if [ "$CLOUDFLARE" -eq 1 ]; then
+  echo "==> Cloudflare: IP reale dei visitatori"
+  cat > /usr/local/bin/alienshop-cloudflare-ips <<'CFSCRIPT'
+#!/usr/bin/env bash
+set -euo pipefail
+tmp="$(mktemp)"
+{
+  echo "# Generato da alienshop: intervalli IP di Cloudflare"
+  for v in 4 6; do
+    curl -fsS --max-time 20 "https://www.cloudflare.com/ips-v$v" | grep -E '^[0-9a-fA-F:.]+(/[0-9]+)?$' | sed 's/^/set_real_ip_from /; s/$/;/'
+  done
+  echo "real_ip_header CF-Connecting-IP;"
+} > "$tmp"
+grep -q '^set_real_ip_from' "$tmp" || { rm -f "$tmp"; exit 1; }
+install -m 644 "$tmp" /etc/nginx/conf.d/alienshop-cloudflare.conf
+rm -f "$tmp"
+nginx -t >/dev/null 2>&1 && systemctl reload nginx >/dev/null 2>&1 || true
+CFSCRIPT
+  chmod 755 /usr/local/bin/alienshop-cloudflare-ips
+  /usr/local/bin/alienshop-cloudflare-ips || echo "Attenzione: impossibile scaricare gli intervalli di Cloudflare."
+  printf '#!/bin/sh\n/usr/local/bin/alienshop-cloudflare-ips\n' > /etc/cron.weekly/alienshop-cloudflare
+  chmod 755 /etc/cron.weekly/alienshop-cloudflare
+fi
+
+if [ "$ROLE" = "backend" ] && [ -n "$RELAY_SECRET" ]; then
+  echo "==> Relay per il tunnel cloudflared (127.0.0.1:$RELAY_PORT)"
+  MAINIP="$("$HESTIA/bin/v-list-sys-ips" plain 2>/dev/null | awk 'NR==1{print $1}')"
+  [ -n "$MAINIP" ] || MAINIP="$(hostname -I | awk '{print $1}')"
+  [ -n "$MAINIP" ] || die "non riesco a determinare l'IP del server"
+  umask 077
+  cat > /etc/nginx/conf.d/alienshop-relay.conf <<RELAY
+server {
+    listen 127.0.0.1:$RELAY_PORT;
+    server_name _;
+    client_max_body_size 64m;
+    location / {
+        if (\$http_x_alien_relay != "$RELAY_SECRET") { return 403; }
+        if (\$http_x_alien_host = "") { return 400; }
+        proxy_pass http://$MAINIP:80;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$http_x_alien_host;
+        proxy_set_header X-Forwarded-For \$http_x_forwarded_for;
+        proxy_set_header X-Real-IP \$http_x_real_ip;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Alien-Relay "";
+        proxy_set_header Connection "";
+        proxy_read_timeout 700s;
+    }
+}
+RELAY
+  chmod 600 /etc/nginx/conf.d/alienshop-relay.conf
+  umask 022
+  nginx_reload || { rm -f /etc/nginx/conf.d/alienshop-relay.conf; die "configurazione Nginx del relay non valida"; }
 fi
 
 echo "==> Esecuzione periodica (ogni minuto)"

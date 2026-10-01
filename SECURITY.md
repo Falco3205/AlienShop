@@ -34,6 +34,7 @@ Questo documento dice cosa è stato controllato, cosa fa il software per protegg
 - Segreti dei lavori (password iniziali, segreti) cifrati nel database dell'hub e cancellati a lavoro concluso; password e segreti oscurati nei registri dell'agente.
 - L'agente esegue solo operazioni fisse e valida ogni parametro (dominio, utente Hestia ammesso, cartella, repository, URL…) con espressioni ancorate; le regole a stringa non lasciano passare ritorni a capo.
 - Accesso a un negozio dall'hub con token monouso da 90 secondi.
+- Tunnel Cloudflare: il frontend entra nel backend solo con un **segreto del relay** (intestazione `X-Alien-Relay`, generato dall'hub, mai nei registri); chi scopre l'hostname del tunnel senza il segreto riceve 403 e non può falsificare l'IP dei visitatori. Con `--cloudflare` l'IP vero arriva da `CF-Connecting-IP`, accettato solo se la richiesta viene da un intervallo IP di Cloudflare (aggiornato ogni settimana).
 - Wizard di installazione protetto da una chiave (`storage/install.key`) quando l'installazione è guidata dall'hub.
 
 ## Prima di andare online (checklist)

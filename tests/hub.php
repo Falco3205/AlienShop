@@ -136,6 +136,24 @@ t('negozio dietro frontend: installazione poi pubblicazione, URL in sottocartell
     eq([Shops::find($id)['status'], Shops::find($id)['last_error']], ['error', 'nginx non valido']);
 });
 
+t('backend con tunnel Cloudflare: upstream dal hostname, segreto del relay, proxy fidati locali, segreto cifrato nel lavoro', function () use ($edgeId) {
+    [$id, , $err] = Nodes::create('Backend CF', 'backend', '198.51.100.7', '', 'falco3205', '', 'Backend-Origin.Falconefabio.it');
+    eq($err, []);
+    $n = Nodes::find($id);
+    eq([$n['upstream'], $n['tunnel_host'], strlen($n['relay_secret'])], ['https://backend-origin.falconefabio.it', 'backend-origin.falconefabio.it', 32]);
+    [$bad] = Nodes::create('X', 'backend', '', '', 'falco3205', '', 'non valido!');
+    eq($bad, null);
+    [$bad] = Nodes::create('X', 'backend', '', '', 'falco3205');
+    eq($bad, null, 'senza upstream né tunnel');
+    [$sid] = Shops::create(['name' => 'Tunnel', 'domain' => 'tunnel.it', 'admin_email' => 't@t.it', 'node_id' => $id, 'mode' => 'edge', 'edge_node_id' => $edgeId]);
+    $j = Jobs::claimFor($id)[0];
+    eq($j['payload']['trusted_proxies'], ['127.0.0.1', '198.51.100.7']);
+    Jobs::complete($j['id'], true, [], 'ok');
+    $e = Jobs::claimFor($edgeId);
+    $p = end($e)['payload'];
+    eq([$p['origin_host'], $p['relay_secret'], $p['upstream']], ['backend-origin.falconefabio.it', $n['relay_secret'], 'https://backend-origin.falconefabio.it']);
+    eq(str_contains((string)DB::val('SELECT payload FROM jobs WHERE shop_id = ? AND type = ?', [$sid, 'add_edge']), $n['relay_secret']), false, 'segreto cifrato a riposo');
+});
 t('installazione fallita: stato errore con messaggio e nuovo tentativo', function () use ($backId) {
     [$id] = Shops::create(['name' => 'Verdi', 'domain' => 'verdi.it', 'admin_email' => 'v@verdi.it', 'node_id' => $backId]);
     $j = Jobs::claimFor($backId)[0];
