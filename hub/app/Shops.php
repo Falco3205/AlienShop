@@ -139,6 +139,9 @@ final class Shops
         if (!preg_match('/^[a-z][a-z0-9_-]{0,31}$/D', $user)) {
             return [null, 'Utente Hestia non valido.'];
         }
+        if ($domain === mb_strtolower((string)parse_url(Config::baseUrl(), PHP_URL_HOST))) {
+            return [null, 'Questo dominio ospita l\'hub: non si crea un negozio qui.'];
+        }
         $backends = Nodes::byRole('backend');
         $default = (int)Settings::get('default_backend', 0);
         $backend = null;
