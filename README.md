@@ -197,7 +197,7 @@ v-add-web-domain-ssl falco3205 dominio.it /root/ssl/dominio.it
 
 ## Limiti noti (leggi prima di usarlo con clienti veri)
 
-Gli script che creano utenti, database, pool PHP e siti Nginx sul backend, il template Hestia del frontend, Tailscale, UFW, Cloudflare, i pagamenti reali, la posta e il Sistema di Interscambio non sono stati provati su server reali: i test coprono hub, agente (in modalità prova) e negozio in locale. Alla prima installazione fai una prova con un dominio tuo e tieni d'occhio la pagina *Attività* dell'hub. I negozi sul backend non possono eseguire comandi di sistema dal web (per sicurezza): si aggiornano dal pannello con il metodo ZIP.
+La parte **nativa del backend** (utente, database, pool PHP-FPM, Nginx, installazione, sottocartelle, sospensione, isolamento) e l'hub sono stati provati per davvero in un container Debian con Nginx, PHP-FPM e MariaDB veri: installazione dell'hub, lavoro creato dall'hub, eseguito dall'agente, negozio attivo e interrogato. **Non provati** su server reali: il template Hestia del frontend, Tailscale, UFW, Cloudflare, i pagamenti, la posta e il Sistema di Interscambio. Alla prima installazione fai una prova con un dominio tuo e tieni d'occhio la pagina *Attività* dell'hub. I negozi sul backend non possono eseguire comandi di sistema dal web (per sicurezza): si aggiornano dal pannello con il metodo ZIP.
 
 ## Test
 

@@ -95,6 +95,8 @@ Crawl automatico di tutte le pagine pubbliche e admin (382 URL, tutti i moduli a
 
 Hub e agente: `php tests/hub.php` (8 test: token, validazione, installazione diretta/tramite frontend/in errore, claim, lavori bloccati, polling e avvisi) e `php tests/node.php` (10 test in modalità prova: installazione nativa sul backend, nomi, sottocartella, isolamento dei pool PHP, sospensione, frontend Hestia, iniezioni rifiutate). Prova completa in locale con hub + negozio reali su porte diverse e agente simulato: login, tutte le pagine, polling, accesso con un clic al negozio, aggiornamento (bloccato correttamente da file modificati), creazione di un negozio e consegna del lavoro.
 
+Backend nativo: provato in un container con Nginx, PHP-FPM e MariaDB reali (`node/stack.sh`, `hub/install.sh`, agente non in prova): negozio in radice e in sottocartella raggiungibili, `config/`, `storage/`, `.git` e host sconosciuti rifiutati, pool PHP con `exec/system/proc_open/popen` disattivati e `open_basedir` attivo (verificato da dentro il pool), sospensione e riattivazione, hub installato e login raggiungibile, ciclo completo hub → agente → negozio → polling → accesso con un clic. Trovati e corretti in quella prova: redirect infinito delle sottocartelle (`location = /cartella`) e cartella `config/` mancante nell'hub.
+
 **Non verificato con servizi reali**: chiamate a Stripe, PayPal, SMTP e IndexNow (nessuna credenziale/rete nel test); sono coperte solo con risposte simulate e verifica delle firme.
 
 ## Estendere
