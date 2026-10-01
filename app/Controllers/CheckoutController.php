@@ -135,6 +135,7 @@ final class CheckoutController extends Controller
             $uid = Auth::create($email, $password, $in('name'), 'customer', $in('phone'));
             $user = DB::row('SELECT id, email, name, phone, role FROM users WHERE id = ?', [$uid]);
             Auth::login($user);
+            \Alien\Services\Notifications::welcome($email, $in('name'));
         }
 
         $address = [

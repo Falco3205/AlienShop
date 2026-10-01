@@ -193,6 +193,10 @@ final class Orders
                 self::event($id, $res['ok'] ? __('Nota di credito %s emessa.', $res['invoice']['number']) : __('Nota di credito non emessa: %s', implode(' ', $res['errors'])));
             }
         }
+        if (in_array($status, ['cancelled', 'refunded'], true) && $restock && $o['email']) {
+            $intro = $status === 'refunded' ? __('Il tuo ordine è stato rimborsato.') : __('Il tuo ordine è stato annullato.');
+            Mailer::send($o['email'], ($status === 'refunded' ? __('Ordine %s rimborsato', $o['number']) : __('Ordine %s annullato', $o['number'])), self::emailHtml(self::find($id), $intro));
+        }
         if ($status === 'shipped' && $o['email']) {
             Mailer::send($o['email'], __('Il tuo ordine %s è stato spedito', $o['number']), self::emailHtml(self::find($id), __('Il tuo ordine è in viaggio!')));
         }

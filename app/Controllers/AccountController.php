@@ -64,6 +64,7 @@ final class AccountController extends Controller
             } else {
                 $id = Auth::create($email, $password, mb_substr($req->str('name'), 0, 190));
                 Auth::login(DB::row('SELECT id, email, name, phone, role FROM users WHERE id = ?', [$id]));
+                \Alien\Services\Notifications::welcome($email, $req->str('name'));
                 return Response::redirect('account');
             }
         }

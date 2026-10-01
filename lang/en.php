@@ -1273,4 +1273,12 @@ return [
     'Sodium (cifratura dei segreti)' => 'Sodium (secrets encryption)',
     'DOM (pulizia HTML, fatturazione elettronica)' => 'DOM (HTML sanitising, e-invoicing)',
     'ZIP (backup completo)' => 'ZIP (full backup)',
+    'Ciao %s,' => 'Hello %s,',
+    'il tuo account è stato creato. Ora puoi seguire i tuoi ordini e acquistare più velocemente.' => 'your account has been created. You can now follow your orders and check out faster.',
+    'Vai al tuo account' => 'Go to your account',
+    'Benvenuto su %s' => 'Welcome to %s',
+    'Il tuo ordine è stato rimborsato.' => 'Your order has been refunded.',
+    'Il tuo ordine è stato annullato.' => 'Your order has been cancelled.',
+    'Ordine %s rimborsato' => 'Order %s refunded',
+    'Ordine %s annullato' => 'Order %s cancelled',
 ];

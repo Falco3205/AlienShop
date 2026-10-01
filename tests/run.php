@@ -638,6 +638,24 @@ t('ordine: scorte insufficienti bloccano l\'ordine senza scalare', function () {
     eq((int)DB::val('SELECT stock_qty FROM products WHERE id = ?', [$pid]), 0);
     Cart::clear();
 });
+t('email: benvenuto e annullo ordine', function () {
+    @mkdir(ROOT . '/storage/logs', 0750, true);
+    $log = ROOT . '/storage/logs/mail.log';
+    @unlink($log);
+    Alien\Services\Notifications::welcome('nuovo@test.dev', 'Nuovo');
+    $pid = Catalog::save(['name' => 'Mail prod', 'price' => 700]);
+    Cart::clear();
+    Cart::add($pid, 0, [], 1);
+    $lines = Cart::lines();
+    $addr = ['name' => 'A', 'address' => 'B', 'city' => 'C', 'zip' => '1', 'country' => 'IT'];
+    $o = Orders::create($lines, Cart::totals($lines), ['email' => 'mail@test.dev', 'billing' => $addr, 'shipping' => $addr], 'bank', null);
+    Orders::setStatus((int)$o['id'], 'cancelled');
+    $content = (string)file_get_contents($log);
+    eq(str_contains($content, 'To: nuovo@test.dev'), true, 'benvenuto');
+    eq(str_contains($content, 'To: mail@test.dev'), true, 'annullo');
+    Cart::clear();
+    @unlink($log);
+});
 t('ricerca: caratteri jolly LIKE neutralizzati', function () {
     eq(DB::like('50%_off!'), '%50!%!_off!!%');
 });
