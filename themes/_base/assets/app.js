@@ -175,6 +175,74 @@
     });
   });
 
+  var wish = [];
+  try { wish = JSON.parse(localStorage.getItem('as_wish') || '[]'); } catch (x) {}
+  function wishPaint() {
+    $$('[data-wish]').forEach(function (b) {
+      var on = wish.indexOf(parseInt(b.dataset.wish, 10)) > -1;
+      b.classList.toggle('on', on); b.setAttribute('aria-pressed', on ? 'true' : 'false');
+      if (b.classList.contains('wish')) b.textContent = on ? '♥' : '♡';
+      else b.textContent = (on ? '♥ ' : '♡ ') + (on ? b.dataset.labelOn : b.dataset.labelOff);
+    });
+    $$('.wish-badge').forEach(function (b) { b.textContent = wish.length; b.style.display = wish.length ? 'flex' : 'none'; });
+  }
+  document.addEventListener('click', function (ev) {
+    var b = ev.target.closest && ev.target.closest('[data-wish]');
+    if (!b) return;
+    ev.preventDefault(); ev.stopPropagation();
+    var id = parseInt(b.dataset.wish, 10), i = wish.indexOf(id);
+    if (i > -1) wish.splice(i, 1); else wish.push(id);
+    try { localStorage.setItem('as_wish', JSON.stringify(wish)); } catch (x) {}
+    wishPaint();
+    var grid = $('#wish-grid');
+    if (grid && i > -1) { var card = b.closest('.card'); if (card) card.remove(); if (!grid.children.length) $('#wish-empty').hidden = false; }
+  });
+  var wg = $('#wish-grid');
+  if (wg && window.fetch) {
+    if (!wish.length) $('#wish-empty').hidden = false;
+    else fetch(wg.dataset.url + '?ids=' + wish.join(',')).then(function (r) { return r.json(); }).then(function (j) { wg.innerHTML = j.html; if (!j.html) $('#wish-empty').hidden = false; wishPaint(); });
+  }
+  wishPaint();
+
+  var nt = $('#notify-form');
+  if (nt && window.fetch) {
+    nt.addEventListener('submit', function (ev) {
+      ev.preventDefault();
+      fetch(nt.action, { method: 'POST', body: new FormData(nt), headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }, credentials: 'same-origin' })
+        .then(function (r) { return r.json(); }).then(function (j) { $('#notify-msg').textContent = j.message; if (j.ok) nt.reset(); }).catch(function () { nt.submit(); });
+    });
+  }
+
+  var ck = $('form[data-refresh] input[name="email"]');
+  if (ck && window.fetch) {
+    var sendCapture = function () {
+      if (!ck.value || ck.validity && !ck.validity.valid) return;
+      fetch(ck.form.dataset.refresh.replace('refresh', 'capture'), { method: 'POST', body: new URLSearchParams({ email: ck.value }), credentials: 'same-origin' });
+    };
+    ck.addEventListener('change', sendCapture);
+    if (ck.value) sendCapture();
+  }
+
+  var nf = $('#newsletter-form');
+  if (nf && window.fetch) {
+    nf.addEventListener('submit', function (ev) {
+      ev.preventDefault();
+      fetch(nf.action, { method: 'POST', body: new FormData(nf), headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }, credentials: 'same-origin' })
+        .then(function (r) { return r.json(); }).then(function (j) { $('#newsletter-msg').textContent = j.message; if (j.ok) nf.reset(); })
+        .catch(function () { nf.submit(); });
+    });
+  }
+
+  var rf = $('#review-form');
+  if (rf && window.fetch) {
+    rf.addEventListener('submit', function (ev) {
+      ev.preventDefault();
+      fetch(rf.action, { method: 'POST', body: new FormData(rf), headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }, credentials: 'same-origin' })
+        .then(function (r) { return r.json(); }).then(function (j) { $('#review-msg').textContent = j.message; if (j.ok) rf.reset(); })
+        .catch(function () { rf.submit(); });
+    });
+  }
+
   $$('[data-autosubmit]').forEach(function (el) {
     el.addEventListener('change', function () { el.form.submit(); });
   });

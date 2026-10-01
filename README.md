@@ -23,10 +23,18 @@ Dopo l'installazione `/install` non è più raggiungibile (`storage/installed.lo
 - **Attributi e variazioni di prezzo**: per ogni attributo si elencano i valori con delta di prezzo (`XL|+2.00`). Le varianti sono generate da tutte le combinazioni; il prezzo è `prezzo base + delta` oppure un override per singola variante, con scorte e SKU per variante.
 - **10 temi preinstallati**: Aurora, Midnight, Boutique, Minimal, Vivid, Nature, Tech, Luxe, Pastel, Brutalist. Anteprima, attivazione, colori, logo, hero e CSS personalizzati dal pannello.
 - **Import/Export**: CSV WooCommerce e Shopify (anche da CLI, `php bin/console import:woocommerce file.csv`). Import idempotente: un secondo import aggiorna invece di duplicare.
-- **Pagamenti**: Stripe Checkout (+ webhook firmato), PayPal Orders v2 (+ webhook verificato), bonifico, contrassegno. Nuovi gateway: aggiungi `app/Payments/XxxGateway.php` estendendo `Gateway`, viene rilevato da solo.
+- **Pagamenti**: Stripe Checkout (+ webhook firmato), PayPal Orders v2 (+ webhook verificato), Mollie (carte, iDEAL, Bancontact, Satispay…), bonifico, contrassegno. Nuovi gateway: aggiungi `app/Payments/XxxGateway.php` estendendo `Gateway`, viene rilevato da solo.
 - **Ordini**: stati, tracking, storico eventi, email transazionali (PHP mail o SMTP), ripristino scorte su annullo/rimborso, coupon (percentuale/fisso/spedizione gratuita), metodi e costi di spedizione per paese, IVA inclusa o esclusa.
 - **Clienti**: checkout ospite o con account, area ordini, profilo, recupero password via email.
 - **Rimborsi**: dal pannello ordine, con rimborso automatico su Stripe e PayPal e ripristino delle scorte. Stampa packing slip.
+- **Estensioni gratuite attivabili** (Admin → Estensioni, un interruttore ciascuna):
+  - **Recensioni**: stelle e commenti con moderazione, badge "acquisto verificato", stelle su Google (`AggregateRating`), richiesta automatica di recensione dopo la spedizione, anti-spam (honeypot, limite per IP).
+  - **Newsletter**: iscrizione con doppia conferma (footer e checkout), campagne in coda inviate a gruppi con link di disiscrizione, esportazione CSV.
+  - **Carrelli abbandonati**: cattura l'email al checkout, promemoria automatico con link che ripristina il carrello e sconto facoltativo, statistiche di recupero.
+  - **Fatture e ricevute PDF**: numerazione annuale progressiva, PDF generato internamente (nessuna libreria), invio automatico al cliente, esportazione CSV per il commercialista. Non sostituisce la fattura elettronica SDI.
+  - **Lista dei desideri**, **Avvisami quando torna disponibile**, **Statistiche interne**.
+- **Backup** con un clic (database o database + immagini in ZIP) e ripristino da riga di comando; **Collaboratori** (più amministratori); filtri per attributo nelle categorie; esportazione ordini CSV.
+- **Attività automatiche senza cron**: invio email in coda, promemoria, richieste di recensione e scadenza degli ordini online non pagati partono da sole durante le visite (opzionale: `* * * * * php bin/console cron:run`).
 - **Admin semplice**: menu raggruppato, ricerca globale, dashboard con saluto, checklist di primi passi, "da fare" (ordini da spedire, scorte basse), andamento con confronto sul periodo precedente, stati ordine con azioni rapide ("Segna come spedito e avvisa il cliente"), stati vuoti con pulsanti guida, anteprima Google e contatori di caratteri nel SEO.
 - **Statistiche interne** (senza cookie né dati personali): imbuto visite → carrello → checkout → ordini, prodotti più cliccati, più venduti, più messi nel carrello, nel carrello ma non comprati, visti ma mai comprati, ricerche dei clienti e ricerche senza risultati.
 - **Wizard Google Analytics 4**: guida passo passo, validazione dell'ID, eventi e-commerce (`view_item`, `add_to_cart`, `begin_checkout`, `purchase`), banner di consenso cookie (Analytics parte solo dopo l'accettazione) e verifica dell'installazione.
@@ -50,6 +58,9 @@ Dopo l'installazione `/install` non è più raggiungibile (`storage/installed.lo
 ```
 php bin/console orders:expire 48   # annulla gli ordini Stripe/PayPal non pagati dopo 48h (cron)
 php bin/console cache:clear
+php bin/console backup:create / backup:restore file.zip
+php bin/console cron:run   # facoltativo, per più precisione
+php bin/console migrate    # dopo un aggiornamento (avviene anche in automatico)
 php bin/console user:password email@dominio.it nuova-password   # recupero accesso admin
 php tests/run.php                  # suite di test
 ```

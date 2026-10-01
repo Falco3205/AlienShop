@@ -67,3 +67,4 @@ td{padding:10px;border-bottom:1px solid var(--border);vertical-align:middle}tr:l
 @media(max-width:900px){.funnel{grid-template-columns:1fr 1fr}}
 .legal-preview h2{font-size:1rem;margin:14px 0 4px}.legal-preview table{border:1px solid var(--border)}
 details>summary::-webkit-details-marker{display:none}
+.switch{width:46px;height:26px;border-radius:99px;border:0;background:#cfd3e4;position:relative;cursor:pointer;flex-shrink:0;transition:background .15s}.switch i{position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:left .15s}.switch.on{background:var(--primary)}.switch.on i{left:23px}

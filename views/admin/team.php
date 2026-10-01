@@ -1,0 +1,7 @@
+<div class="grid2"><div class="card" style="padding:0"><table><thead><tr><th><?= e(__('Nome')) ?></th><th>Email</th><th></th></tr></thead><tbody>
+<?php foreach ($rows as $r): ?><tr><td><?= e($r['name']) ?><?= (int)$r['id'] === $me ? ' <span class="pill ok">' . e(__('tu')) . '</span>' : '' ?></td><td><?= e($r['email']) ?></td><td class="right" style="display:flex;gap:6px;justify-content:flex-end">
+<form method="post" action="<?= e(url('admin/team/' . $r['id'] . '/reset')) ?>"><?= csrf_field() ?><button class="btn sec sm"><?= e(__('Invia reset password')) ?></button></form>
+<?php if ((int)$r['id'] !== $me): ?><form method="post" action="<?= e(url('admin/team/' . $r['id'] . '/remove')) ?>" data-confirm="<?= e(__('Revocare l\'accesso?')) ?>"><?= csrf_field() ?><button class="btn danger sm">✕</button></form><?php endif ?></td></tr><?php endforeach ?></tbody></table></div>
+<div class="card"><h2><?= e(__('Aggiungi un collaboratore')) ?></h2><form method="post" action="<?= e(url('admin/team')) ?>"><?= csrf_field() ?>
+<?= a_input('name', __('Nome'), '') ?><?= a_input('email', 'Email', '', 'email', ['required' => true]) ?><?= a_input('password', __('Password iniziale (min. 8)'), '', 'password', ['required' => true, 'minlength' => 8, 'autocomplete' => 'new-password']) ?>
+<p class="muted" style="font-size:.85rem"><?= e(__('I collaboratori hanno accesso completo al pannello.')) ?></p><button class="btn" type="submit"><?= e(__('Aggiungi')) ?></button></form></div></div>

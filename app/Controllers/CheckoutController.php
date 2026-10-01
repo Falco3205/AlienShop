@@ -10,6 +10,7 @@ use Alien\Core\Response;
 use Alien\Core\Session;
 use Alien\Payments\Registry;
 use Alien\Core\Money;
+use Alien\Services\AbandonedCarts;
 use Alien\Services\Analytics;
 use Alien\Services\Cart;
 use Alien\Services\Orders;
@@ -33,6 +34,9 @@ final class CheckoutController extends Controller
             'currency' => Money::currency(), 'value' => Analytics::amount((int)$totals['total']),
             'items' => array_values(array_map(static fn($l) => Analytics::item($l['product'], (int)$l['unit'], (int)$l['qty'], $l['label']), $lines)),
         ]);
+        if ($user = Auth::user()) {
+            AbandonedCarts::capture((string)$user['email']);
+        }
         foreach ($lines as $l) {
             $pid = (int)$l['product']['id'];
             if (empty($_SESSION['stat_ck'][$pid])) {
@@ -50,6 +54,12 @@ final class CheckoutController extends Controller
             'user' => Auth::user(),
             'errors' => $errors,
         ]));
+    }
+
+    public function capture(Request $req): Response
+    {
+        AbandonedCarts::capture($req->str('email'));
+        return new Response('', 204);
     }
 
     public function refresh(Request $req): Response
@@ -119,10 +129,14 @@ final class CheckoutController extends Controller
             'name' => $in('name'), 'phone' => $in('phone'), 'address' => $in('address'),
             'city' => $in('city'), 'zip' => $in('zip'), 'state' => $in('state'), 'country' => $country,
         ];
+        AbandonedCarts::orderPlaced($email);
         $order = Orders::create($lines, $totals, [
             'email' => $email, 'billing' => $address, 'shipping' => $address, 'note' => mb_substr($req->str('note'), 0, 1000),
         ], $gateway->id(), $user ? (int)$user['id'] : null);
 
+        if ($req->str('newsletter') === '1' && \Alien\Services\Modules::on('newsletter')) {
+            \Alien\Services\Newsletter::subscribe($email, $in('name'), 'checkout');
+        }
         $start = $gateway->start($order);
         if (isset($start['error'])) {
             Orders::setStatus((int)$order['id'], 'cancelled');
@@ -162,6 +176,17 @@ final class CheckoutController extends Controller
         Seo::set(['title' => __('Ordine %s', $order['number'])]);
         Seo::noindex();
         return $this->noStore($this->render('thank-you', ['order' => $order, 'gateway' => Registry::get($order['payment_method'])]));
+    }
+
+    public function invoice(Request $req, array $params): Response
+    {
+        $order = Orders::findByToken($params['token']);
+        if (!$order || !\Alien\Services\Modules::on('invoices') || $order['payment_status'] !== 'paid') {
+            return $this->missing($req);
+        }
+        $pdf = \Alien\Services\Invoices::pdf($order);
+        $order = Orders::find((int)$order['id']);
+        return Response::download($pdf, 'documento-' . str_replace('/', '-', $order['invoice_number']) . '.pdf', 'application/pdf');
     }
 
     public function paymentReturn(Request $req, array $params): Response

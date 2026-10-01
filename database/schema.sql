@@ -54,6 +54,8 @@ CREATE TABLE IF NOT EXISTS products (
   seo_description VARCHAR(320) NOT NULL DEFAULT '',
   noindex INTEGER NOT NULL DEFAULT 0,
   featured INTEGER NOT NULL DEFAULT 0,
+  rating_avg INTEGER NOT NULL DEFAULT 0,
+  rating_count INTEGER NOT NULL DEFAULT 0,
   external_id VARCHAR(100) NOT NULL DEFAULT '',
   created_at VARCHAR(19) NOT NULL,
   updated_at VARCHAR(19) NOT NULL
@@ -186,6 +188,9 @@ CREATE TABLE IF NOT EXISTS orders (
   shipping_address TEXT,
   note TEXT,
   tracking VARCHAR(190) NOT NULL DEFAULT '',
+  invoice_number VARCHAR(30) NOT NULL DEFAULT '',
+  invoice_date VARCHAR(19),
+  review_asked INTEGER NOT NULL DEFAULT 0,
   created_at VARCHAR(19) NOT NULL,
   updated_at VARCHAR(19) NOT NULL
 ){ENGINE};
@@ -249,3 +254,63 @@ CREATE TABLE IF NOT EXISTS search_terms (
   last_at VARCHAR(19) NOT NULL
 ){ENGINE};
 CREATE UNIQUE INDEX idx_st_term ON search_terms (term);
+
+CREATE TABLE IF NOT EXISTS reviews (
+  id {PK},
+  product_id INTEGER NOT NULL,
+  author VARCHAR(120) NOT NULL,
+  email VARCHAR(190) NOT NULL DEFAULT '',
+  rating INTEGER NOT NULL,
+  title VARCHAR(190) NOT NULL DEFAULT '',
+  body TEXT,
+  status VARCHAR(10) NOT NULL DEFAULT 'pending',
+  verified INTEGER NOT NULL DEFAULT 0,
+  ip_hash VARCHAR(40) NOT NULL DEFAULT '',
+  created_at VARCHAR(19) NOT NULL
+){ENGINE};
+CREATE INDEX idx_reviews_product ON reviews (product_id, status);
+
+CREATE TABLE IF NOT EXISTS subscribers (
+  id {PK},
+  email VARCHAR(190) NOT NULL,
+  name VARCHAR(120) NOT NULL DEFAULT '',
+  status VARCHAR(12) NOT NULL DEFAULT 'pending',
+  token VARCHAR(40) NOT NULL,
+  source VARCHAR(30) NOT NULL DEFAULT 'footer',
+  created_at VARCHAR(19) NOT NULL
+){ENGINE};
+CREATE UNIQUE INDEX idx_subscribers_email ON subscribers (email);
+
+CREATE TABLE IF NOT EXISTS mail_queue (
+  id {PK},
+  to_email VARCHAR(190) NOT NULL,
+  subject VARCHAR(255) NOT NULL,
+  body TEXT NOT NULL,
+  campaign VARCHAR(60) NOT NULL DEFAULT '',
+  attempts INTEGER NOT NULL DEFAULT 0,
+  sent_at VARCHAR(19),
+  created_at VARCHAR(19) NOT NULL
+){ENGINE};
+CREATE INDEX idx_mq_sent ON mail_queue (sent_at);
+
+CREATE TABLE IF NOT EXISTS abandoned_carts (
+  id {PK},
+  email VARCHAR(190) NOT NULL,
+  token VARCHAR(40) NOT NULL,
+  cart TEXT NOT NULL,
+  total INTEGER NOT NULL DEFAULT 0,
+  reminded_at VARCHAR(19),
+  recovered INTEGER NOT NULL DEFAULT 0,
+  created_at VARCHAR(19) NOT NULL,
+  updated_at VARCHAR(19) NOT NULL
+){ENGINE};
+CREATE UNIQUE INDEX idx_ac_token ON abandoned_carts (token);
+CREATE INDEX idx_ac_email ON abandoned_carts (email);
+
+CREATE TABLE IF NOT EXISTS stock_alerts (
+  id {PK},
+  product_id INTEGER NOT NULL,
+  email VARCHAR(190) NOT NULL,
+  created_at VARCHAR(19) NOT NULL
+){ENGINE};
+CREATE UNIQUE INDEX idx_sa_unique ON stock_alerts (product_id, email);

@@ -10,6 +10,8 @@ use Alien\Core\Response;
 use Alien\Core\Str;
 use Alien\Services\Analytics;
 use Alien\Services\Catalog;
+use Alien\Services\Modules;
+use Alien\Services\Reviews;
 use Alien\Services\Seo;
 use Alien\Services\Stats;
 
@@ -52,6 +54,13 @@ final class ShopController extends Controller
         if ($category) {
             $filters['category_id'] = (int)$category['id'];
         }
+        $attrs = [];
+        foreach ((array)($req->query['attr'] ?? []) as $k => $v) {
+            if (is_string($k) && is_string($v) && $v !== '' && count($attrs) < 5) {
+                $attrs[mb_substr($k, 0, 120)] = mb_substr($v, 0, 190);
+            }
+        }
+        $filters['attrs'] = $attrs;
         $result = Catalog::lookup($filters);
         if ($filters['page'] > 1 && !$result['items']) {
             return $this->missing($req);
@@ -67,7 +76,7 @@ final class ShopController extends Controller
         } else {
             $trail[] = [$title, $base];
         }
-        $filtered = isset($filters['min']) || isset($filters['max']) || $filters['sort'] !== 'new';
+        $filtered = isset($filters['min']) || isset($filters['max']) || $filters['sort'] !== 'new' || $attrs !== [];
         Seo::set([
             'title' => $category && $category['seo_title'] !== '' ? $category['seo_title'] : $title . ($result['page'] > 1 ? ' — ' . __('Pagina %d', $result['page']) : ''),
             'description' => $category ? ($category['seo_description'] !== '' ? $category['seo_description'] : Str::excerpt($category['description'], 160)) : (string)setting('store_description', ''),
@@ -88,6 +97,8 @@ final class ShopController extends Controller
             'result' => $result,
             'trail' => $trail,
             'base' => $base,
+            'facets' => Catalog::facets($category ? (int)$category['id'] : null),
+            'activeAttrs' => $attrs,
         ]);
     }
 
@@ -101,9 +112,60 @@ final class ShopController extends Controller
         Analytics::event('view_item', ['currency' => Money::currency(), 'value' => Analytics::amount((int)$product['price_min']), 'items' => [Analytics::item($product, (int)$product['price_min'])]]);
         return $this->render('product', [
             'product' => $product,
+            'reviews' => Modules::on('reviews') ? Reviews::forProduct((int)$product['id']) : [],
             'trail' => Seo::productTrail($product),
             'related' => Catalog::related($product, 4),
         ]);
+    }
+
+    public function review(Request $req, array $params): Response
+    {
+        $product = Catalog::productBySlug($params['slug']);
+        if (!$product || !Modules::on('reviews')) {
+            return $this->missing($req);
+        }
+        $error = trim((string)($req->post['website'] ?? '')) !== '' ? null : Reviews::submit((int)$product['id'], $req->post, $req->ip());
+        $message = $error ?? ((string)setting('reviews_auto', '0') === '1' ? __('Grazie! La tua recensione è stata pubblicata.') : __('Grazie! La tua recensione sarà pubblicata dopo la moderazione.'));
+        if ($req->isAjax()) {
+            return Response::json(['ok' => $error === null, 'message' => $message], $error === null ? 200 : 422);
+        }
+        return Response::redirect('products/' . $product['slug'] . '?reviewed=' . ($error === null ? 'ok' : 'error') . '&m=' . rawurlencode($message) . '#reviews');
+    }
+
+    public function notify(Request $req, array $params): Response
+    {
+        $product = Catalog::productBySlug($params['slug']);
+        if (!$product || !Modules::on('stock_alerts')) {
+            return $this->missing($req);
+        }
+        $error = trim((string)($req->post['website'] ?? '')) !== '' ? null : \Alien\Services\StockAlerts::subscribe((int)$product['id'], $req->str('email'));
+        $message = $error ?? __('Perfetto! Ti scriveremo appena sarà di nuovo disponibile.');
+        if ($req->isAjax()) {
+            return Response::json(['ok' => $error === null, 'message' => $message], $error === null ? 200 : 422);
+        }
+        return $this->noStore($this->render('message', ['heading' => $error === null ? __('Fatto!') : __('Qualcosa non ha funzionato'), 'text' => $message]));
+    }
+
+    public function wishlistPage(Request $req): Response
+    {
+        if (!Modules::on('wishlist')) {
+            return $this->missing($req);
+        }
+        Seo::set(['title' => __('I miei preferiti')]);
+        Seo::noindex();
+        return $this->render('wishlist');
+    }
+
+    public function wishlistCards(Request $req): Response
+    {
+        $ids = array_slice(array_filter(array_map('intval', explode(',', $req->str('ids')))), 0, 60);
+        $html = '';
+        if ($ids && Modules::on('wishlist')) {
+            foreach (DB::all("SELECT * FROM products WHERE status = 'active' AND id IN (" . DB::marks($ids) . ')', $ids) as $p) {
+                $html .= \Alien\Core\View::partial('product-card', ['p' => $p]);
+            }
+        }
+        return Response::json(['html' => $html])->header('Cache-Control', 'private, no-store');
     }
 
     public function search(Request $req): Response

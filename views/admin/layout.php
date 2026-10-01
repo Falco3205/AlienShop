@@ -24,10 +24,22 @@ $groups = [
     __('Configurazione') => [
         'payments' => ['admin/payments', __('Pagamenti'), 'M2 7h20v12H2zM2 11h20'],
         'shipping' => ['admin/shipping', __('Spedizioni'), 'M1 3h15v13H1zM16 8h4l3 3v5h-7zM6 19.5a1.5 1.5 0 100-3 1.5 1.5 0 000 3zM18 19.5a1.5 1.5 0 100-3 1.5 1.5 0 000 3z'],
+        'modules' => ['admin/modules', __('Estensioni'), 'M12 2l3 7h7l-5.5 4.5L18 21l-6-4-6 4 1.5-7.5L2 9h7z'],
+        'backup' => ['admin/backup', __('Backup'), 'M4 7c0-1.7 3.6-3 8-3s8 1.3 8 3-3.6 3-8 3-8-1.3-8-3zM4 7v10c0 1.7 3.6 3 8 3s8-1.3 8-3V7'],
         'import' => ['admin/import', __('Import / Export'), 'M12 3v12M7 10l5 5 5-5M5 21h14'],
         'settings' => ['admin/settings', __('Impostazioni'), 'M12 15a3 3 0 100-6 3 3 0 000 6zM12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1'],
     ],
 ];
+$extra = [];
+foreach (Alien\Services\Modules::all() as $mid => $mod) {
+    if ($mod['link'] && $mid !== 'stats' && Alien\Services\Modules::on($mid)) {
+        $map = ['abandoned_cart' => 'abandoned'];
+        $extra[$map[$mid] ?? $mid] = [$mod['link'], $mod['name'], 'M12 5v14M5 12h14'];
+    }
+}
+if ($extra) {
+    $groups = array_slice($groups, 0, 3, true) + [__('Estensioni attive') => $extra] + array_slice($groups, 3, null, true);
+}
 ?>
 <!doctype html>
 <html lang="<?= e(Alien\Core\Lang::locale()) ?>">

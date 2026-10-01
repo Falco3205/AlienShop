@@ -8,10 +8,13 @@ use Alien\Controllers\AccountController;
 use Alien\Controllers\CartController;
 use Alien\Controllers\CheckoutController;
 use Alien\Controllers\InstallController;
+use Alien\Controllers\NewsletterController;
 use Alien\Controllers\SeoController;
 use Alien\Controllers\ShopController;
 use Alien\Controllers\WebhookController;
 use Alien\Services\Catalog;
+use Alien\Services\Cron;
+use Alien\Services\Migrator;
 use Alien\Services\Redirects;
 use Alien\Services\Seo;
 
@@ -48,12 +51,18 @@ final class App
             }
 
             DB::boot();
+            if (Migrator::needed()) {
+                Migrator::run();
+            }
             Lang::load((string)Settings::get('locale', 'it'));
             $response = self::dispatch($req);
-            if ($cacheKey && $response->status === 200) {
+            if ($cacheKey && $response->status === 200 && empty($GLOBALS['as_flash_shown'])) {
                 Cache::put($cacheKey, $response->body);
             }
             self::send($response);
+            if (!str_starts_with($req->path, '/webhooks/')) {
+                Cron::maybeRun();
+            }
         } catch (\Throwable $e) {
             self::fail($e);
         }
@@ -92,6 +101,13 @@ final class App
         $r->get('/collections/{slug}', [ShopController::class, 'collection']);
         $r->get('/products/{slug}', [ShopController::class, 'product']);
         $r->post('/t', [ShopController::class, 'beacon']);
+        $r->post('/products/{slug}/reviews', [ShopController::class, 'review']);
+        $r->post('/newsletter/subscribe', [NewsletterController::class, 'subscribe']);
+        $r->get('/newsletter/confirm/{token}', [NewsletterController::class, 'confirm']);
+        $r->get('/newsletter/unsubscribe/{token}', [NewsletterController::class, 'unsubscribe']);
+        $r->post('/products/{slug}/notify', [ShopController::class, 'notify']);
+        $r->get('/wishlist', [ShopController::class, 'wishlistPage']);
+        $r->get('/wishlist/cards', [ShopController::class, 'wishlistCards']);
         $r->get('/search', [ShopController::class, 'search']);
         $r->get('/pages/{slug}', [ShopController::class, 'page']);
         $r->get('/blog', [ShopController::class, 'blog']);
@@ -108,8 +124,11 @@ final class App
 
         $r->get('/checkout', [CheckoutController::class, 'show']);
         $r->post('/checkout', [CheckoutController::class, 'place']);
+        $r->post('/checkout/capture', [CheckoutController::class, 'capture']);
+        $r->get('/cart/recover/{token}', [CartController::class, 'recover']);
         $r->post('/checkout/refresh', [CheckoutController::class, 'refresh']);
         $r->get('/checkout/thank-you/{token}', [CheckoutController::class, 'thanks']);
+        $r->get('/invoice/{token}', [CheckoutController::class, 'invoice']);
         $r->get('/pay/return/{gateway}', [CheckoutController::class, 'paymentReturn']);
         $r->get('/pay/cancel/{token}', [CheckoutController::class, 'paymentCancel']);
         $r->post('/webhooks/{gateway}', [WebhookController::class, 'handle']);
@@ -149,7 +168,7 @@ final class App
 
     private static function cacheKey(Request $req): ?string
     {
-        if ($req->method !== 'GET' || isset($_COOKIE['as_admin']) || isset($req->query['preview_theme'])) {
+        if ($req->method !== 'GET' || isset($_COOKIE['as_admin']) || isset($req->query['preview_theme']) || isset($req->query['reviewed']) || isset($req->query['attr'])) {
             return null;
         }
         foreach (self::CACHEABLE as $re) {

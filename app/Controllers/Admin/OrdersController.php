@@ -67,6 +67,25 @@ final class OrdersController extends AdminController
         return $this->view('orders/show', ['title' => __('Ordine %s', $order['number']), 'o' => $order], 'orders');
     }
 
+    public function export(Request $req): Response
+    {
+        $from = preg_match('/^\d{4}-\d{2}-\d{2}$/', $req->str('from')) ? $req->str('from') : date('Y-m-01');
+        $to = preg_match('/^\d{4}-\d{2}-\d{2}$/', $req->str('to')) ? $req->str('to') : date('Y-m-d');
+        $fh = fopen('php://temp', 'r+');
+        fwrite($fh, "\xEF\xBB\xBF");
+        fputcsv($fh, ['number', 'date', 'status', 'payment_status', 'payment_method', 'email', 'name', 'country', 'items', 'subtotal', 'discount', 'shipping', 'tax', 'total', 'currency', 'coupon', 'tracking'], ',', '"', '\\');
+        foreach (DB::all('SELECT * FROM orders WHERE created_at >= ? AND created_at <= ? ORDER BY id', [$from . ' 00:00:00', $to . ' 23:59:59']) as $o) {
+            $order = Orders::find((int)$o['id']);
+            $addr = $order['shipping_address'];
+            $dec = static fn($c) => \Alien\Core\Money::input((int)$c);
+            fputcsv($fh, [$o['number'], $o['created_at'], $o['status'], $o['payment_status'], $o['payment_method'], $o['email'], $addr['name'] ?? '', $addr['country'] ?? '',
+                implode(' | ', array_map(static fn($i) => $i['qty'] . 'x ' . $i['name'] . ($i['variant_label'] ? ' (' . $i['variant_label'] . ')' : ''), $order['items'])),
+                $dec($o['subtotal']), $dec($o['discount']), $dec($o['shipping']), $dec($o['tax']), $dec($o['total']), $o['currency'], $o['coupon_code'], $o['tracking']], ',', '"', '\\');
+        }
+        rewind($fh);
+        return Response::download((string)stream_get_contents($fh), "ordini-$from-$to.csv");
+    }
+
     public function printSlip(Request $req, array $params): Response
     {
         $order = Orders::find((int)$params['id']);

@@ -80,6 +80,30 @@ switch ($command) {
         echo "Password aggiornata.\n";
         exit(0);
 
+    case 'backup:create':
+        $zipPath = Alien\Services\Backup::zipAvailable() ? Alien\Services\Backup::fullArchive() : Alien\Services\Backup::databaseFile()[1];
+        $target = $args[0] ?? (ROOT . '/storage/backup-' . date('Ymd-His') . (Alien\Services\Backup::zipAvailable() ? '.zip' : '.bak'));
+        rename($zipPath, $target);
+        echo "Backup creato: $target\n";
+        exit(0);
+
+    case 'backup:restore':
+        if (!isset($args[0]) || !is_file($args[0])) {
+            fwrite(STDERR, "Uso: console backup:restore <file.zip|file.sqlite|file.sql>\n");
+            exit(1);
+        }
+        echo Alien\Services\Backup::restore($args[0]) . "\n";
+        exit(0);
+
+    case 'cron:run':
+        echo json_encode(Alien\Services\Cron::run()) . "\n";
+        exit(0);
+
+    case 'migrate':
+        Alien\Services\Migrator::run();
+        echo "Database aggiornato.\n";
+        exit(0);
+
     case 'cache:clear':
         Cache::flush();
         Themes::build(Alien\Core\View::theme());
@@ -93,6 +117,7 @@ switch ($command) {
             . "  export:woocommerce [file.csv]\n  export:shopify [file.csv]\n"
             . "  orders:expire [ore=48]   annulla ordini Stripe/PayPal non pagati (da usare in cron)\n"
             . "  user:password <email> <password>   reimposta la password di un utente\n"
+            . "  backup:create [file] | backup:restore <file>\n  cron:run   esegue le attività pianificate (email, promemoria, scadenze)\n  migrate    aggiorna il database\n"
             . "  cache:clear\n";
         exit($command === '' ? 0 : 1);
 }

@@ -28,6 +28,9 @@ final class SettingsController extends AdminController
             ['admin/redirects', '↪️', __('Redirect e 404'), __('Mantieni il posizionamento quando cambiano gli URL.')],
             ['admin/import', '📦', __('Import / Export'), __('Da e verso WooCommerce e Shopify.')],
             ['admin/themes', '🎨', __('Aspetto e temi'), __('10 temi, colori, logo e home page.')],
+            ['admin/modules', '🧩', __('Estensioni'), __('Recensioni, newsletter, carrelli abbandonati, fatture e altro: attiva quello che ti serve.')],
+            ['admin/backup', '💾', __('Backup'), __('Scarica una copia di sicurezza del tuo negozio.')],
+            ['admin/team', '👥', __('Collaboratori'), __('Chi può accedere al pannello.')],
             ['admin/profile', '👤', __('Il mio profilo'), __('Email e password di accesso.')],
         ];
         return $this->view('settings/hub', ['title' => __('Impostazioni'), 'subtitle' => __('Tutto quello che puoi configurare, in un posto solo'), 'cards' => $cards], 'settings');

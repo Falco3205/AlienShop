@@ -11,7 +11,7 @@ final class Stats
 
     public static function bump(string $field, int $productId, int $n = 1): void
     {
-        if (!in_array($field, self::FIELDS, true) || $productId <= 0 || self::isBot()) {
+        if (!in_array($field, self::FIELDS, true) || $productId <= 0 || !Modules::on('stats') || self::isBot()) {
             return;
         }
         $day = date('Y-m-d');
@@ -32,7 +32,7 @@ final class Stats
     public static function search(string $term, int $results): void
     {
         $term = mb_strtolower(trim(mb_substr($term, 0, 100)));
-        if ($term === '' || self::isBot()) {
+        if ($term === '' || !Modules::on('stats') || self::isBot()) {
             return;
         }
         $zero = $results === 0 ? 1 : 0;

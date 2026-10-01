@@ -41,6 +41,7 @@ $logo = setting('logo');
     </nav>
     <div class="actions">
       <button class="icon-btn" type="button" data-search-toggle aria-label="<?= e(__('Cerca')) ?>"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></button>
+      <?php if (Alien\Services\Modules::on('wishlist')): ?><a class="icon-btn" href="<?= e(url('wishlist')) ?>" aria-label="<?= e(__('Preferiti')) ?>"><svg viewBox="0 0 24 24"><path d="M12 21s-7-4.4-9.3-9A5.2 5.2 0 0112 6a5.2 5.2 0 019.3 6c-2.3 4.6-9.3 9-9.3 9z"/></svg><span class="badge wish-badge"></span></a><?php endif ?>
       <a class="icon-btn" href="<?= e(url('account')) ?>" aria-label="<?= e(__('Account')) ?>"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg></a>
       <a class="icon-btn" href="<?= e(url('cart')) ?>" aria-label="<?= e(__('Carrello')) ?>"><svg viewBox="0 0 24 24"><path d="M6 6h15l-1.6 9H7.6L6 3H3"/><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/></svg><span class="badge cart-badge"></span></a>
     </div>
@@ -64,6 +65,10 @@ $logo = setting('logo');
         <li><a href="<?= e(url('account')) ?>"><?= e(__('Il mio account')) ?></a></li>
         <?php if (Alien\Services\Analytics::enabled() && Alien\Services\Analytics::consentRequired()): ?><li><a href="#" data-cookie-settings><?= e(__('Preferenze cookie')) ?></a></li><?php endif ?></ul></div>
     </div>
+    <?php if (Alien\Services\Modules::on('newsletter')): ?>
+    <form id="newsletter-form" class="newsletter" method="post" action="<?= e(url('newsletter/subscribe')) ?>"><strong><?= e(__('Iscriviti alla newsletter')) ?></strong>
+      <input type="email" name="email" required placeholder="<?= e(__('La tua email')) ?>" aria-label="Email"><div style="position:absolute;left:-9999px" aria-hidden="true"><input name="website" tabindex="-1" autocomplete="off"></div><button class="btn btn-sm" type="submit"><?= e(__('Iscrivimi')) ?></button><span id="newsletter-msg" role="status"></span></form>
+    <?php endif ?>
     <div class="copyright"><span>© <?= date('Y') ?> <?= e($store) ?></span><span><?= e(setting('footer_note', '')) ?></span></div>
   </div>
 </footer>

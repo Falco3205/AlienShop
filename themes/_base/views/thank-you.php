@@ -11,5 +11,6 @@
   <table class="cart" style="text-align:left"><tbody>
   <?php foreach ($order['items'] as $it): ?><tr><td><?= e($it['name']) ?><?= $it['variant_label'] ? ' <small>(' . e($it['variant_label']) . ')</small>' : '' ?> × <?= (int)$it['qty'] ?></td><td style="text-align:right"><?= e(money($it['total'])) ?></td></tr><?php endforeach ?>
   </tbody></table>
+  <?php if ($order['payment_status'] === 'paid' && Alien\Services\Modules::on('invoices')): ?><p><a href="<?= e(url('invoice/' . $order['token'])) ?>">🧾 <?= e(__('Scarica il documento PDF')) ?></a></p><?php endif ?>
   <p style="margin-top:24px"><a class="btn" href="<?= e(url('collections/all')) ?>"><?= e(__('Continua lo shopping')) ?></a></p>
 </div>

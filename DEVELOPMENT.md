@@ -10,7 +10,7 @@ PHP 8.1+ senza dipendenze, PDO con SQLite o MySQL. Il front controller è `publi
 
 | Percorso | Contenuto |
 |---|---|
-| `app/Core` | App (routing, cache pagine, errori), Config, DB, Request/Response/Router, Session, Csrf, Auth, Settings, View (con fallback tema → `_base`), Lang, Money, Str, ImageProcessor (GD→WebP), Http (cURL + anti-SSRF, reset password, rimborsi, IVA per paese, log 404, immagine principale, Analytics, pagine legali, statistiche), Mailer (mail/SMTP), Cache |
+| `app/Core` | App (routing, cache pagine, errori), Config, DB, Request/Response/Router, Session, Csrf, Auth, Settings, View (con fallback tema → `_base`), Lang, Money, Str, ImageProcessor (GD→WebP), Http (cURL + anti-SSRF, reset password, rimborsi, IVA per paese, log 404, immagine principale, Analytics, pagine legali, statistiche, recensioni, newsletter, carrelli abbandonati, fatture, avvisi disponibilità, Mollie, filtri, backup), Mailer (mail/SMTP), Cache |
 | `app/Services` | Catalog (prodotti, attributi, varianti, categorie), Cart, Coupons, Shipping, Orders, Redirects, Seo, Sitemap, IndexNow, Themes, Installer, Demo |
 | `app/Payments` | `Gateway` astratto, Stripe, PayPal, Bank, Cod, `Registry` (auto-discovery di `*Gateway.php`) |
 | `app/Import` | CsvReader, Writer, WooImporter, ShopifyImporter, Exporter, Result |
@@ -35,6 +35,16 @@ PHP 8.1+ senza dipendenze, PDO con SQLite o MySQL. Il front controller è `publi
 
 **Pagine legali.** `LegalTemplates::build($profilo, $lingua)` genera 6 pagine da un profilo salvato in `settings.legal_profile`; `publish()` le crea o aggiorna per slug. Tutti i valori inseriti sono escapati.
 
+**Estensioni.** `Modules` (registro con id, testo, default e link) legge `settings.mod_<id>`; ogni funzione controlla `Modules::on()`. Gli interruttori sono in `/admin/modules`; le estensioni attive compaiono nel menu.
+
+**Migrazioni.** `Migrator` (versione schema in `settings.schema_version`) riesegue lo schema tollerando "già esistente" e aggiunge le colonne nuove; parte da solo al primo avvio dopo un aggiornamento (`bin/console migrate` per farlo a mano).
+
+**Cron senza cron.** `Cron::maybeRun()` dopo l'invio di ogni pagina dinamica, al massimo una volta al minuto (file `storage/cron.lock`, `fastcgi_finish_request` quando c'è): scade gli ordini online non pagati, svuota `mail_queue` (30 mail/minuto, usata da campagne, promemoria, avvisi, richieste recensione), manda i promemoria dei carrelli e le richieste di recensione.
+
+**Pagine in cache e form.** Le pagine cacheabili sono HTML statico: recensioni, newsletter e avvisi disponibilità usano `fetch` con risposta JSON (con ripiego su una pagina non in cache), non c'è CSRF ma controllo di origine, honeypot e limiti. I flash message non vengono mai messi in cache (`as_flash_shown`).
+
+**PDF.** `Core\Pdf` scrive PDF 1.4 con Helvetica standard (WinAnsi, tabelle di larghezze incluse): testo, linee, rettangoli, a capo e pagine multiple. `Invoices::pdf()` compone il documento; `Mailer::send()` supporta allegati.
+
 **Rimborsi.** `Gateway::refund()` (Stripe `/v1/refunds` sul `payment_intent`, PayPal `/captures/{id}/refund`); l'ordine passa a `refunded` solo se il gateway conferma.
 
 **Redirect.** `Redirects::add()` appiattisce le catene. Ogni cambio slug in `Catalog::save/saveCategory` e nelle pagine crea un 301; una pagina 404 per un URL sconosciuto consulta la tabella prima di rispondere.
@@ -49,7 +59,7 @@ PHP 8.1+ senza dipendenze, PDO con SQLite o MySQL. Il front controller è `publi
 
 ## Verifica eseguita
 
-`php tests/run.php` (35 test: formati monetari, prezzi variante, redirect, carrello, scorte, coupon, firme Stripe, flusso Stripe/PayPal con HTTP simulato, SEO, import/export con round trip, anti-SSRF, reset password, rimborsi, IVA per paese, log 404, immagine principale, Analytics, pagine legali, statistiche). Test manuali via browser: wizard, tutte le pagine admin, flusso carrello→checkout→ordine, cache/304/gzip, redirect, anteprima dei 10 temi.
+`php tests/run.php` (46 test: formati monetari, prezzi variante, redirect, carrello, scorte, coupon, firme Stripe, flusso Stripe/PayPal con HTTP simulato, SEO, import/export con round trip, anti-SSRF, reset password, rimborsi, IVA per paese, log 404, immagine principale, Analytics, pagine legali, statistiche, recensioni, newsletter, carrelli abbandonati, fatture, avvisi disponibilità, Mollie, filtri, backup). Test manuali via browser: wizard, tutte le pagine admin, flusso carrello→checkout→ordine, cache/304/gzip, redirect, anteprima dei 10 temi.
 
 **Non verificato con servizi reali**: chiamate a Stripe, PayPal, SMTP e IndexNow (nessuna credenziale/rete nel test); sono coperte solo con risposte simulate e verifica delle firme.
 

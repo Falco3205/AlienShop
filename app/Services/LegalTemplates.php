@@ -37,8 +37,8 @@ final class LegalTemplates
     {
         $tools = [];
         foreach (Registry::enabled() as $g) {
-            if (in_array($g->id(), ['stripe', 'paypal'], true)) {
-                $tools[] = $g->id() === 'stripe' ? 'Stripe' : 'PayPal';
+            if (in_array($g->id(), ['stripe', 'paypal', 'mollie'], true)) {
+                $tools[] = ['stripe' => 'Stripe', 'paypal' => 'PayPal', 'mollie' => 'Mollie'][$g->id()];
             }
         }
         return ['payments' => $tools, 'analytics' => Analytics::id() !== ''];

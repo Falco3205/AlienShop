@@ -21,7 +21,7 @@ final class Registry
                     self::$all[$g->id()] = $g;
                 }
             }
-            $order = ['stripe' => 0, 'paypal' => 1, 'bank' => 2, 'cod' => 3];
+            $order = ['stripe' => 0, 'paypal' => 1, 'mollie' => 2, 'bank' => 3, 'cod' => 4];
             uksort(self::$all, static fn($a, $b) => ($order[$a] ?? 9) <=> ($order[$b] ?? 9));
         }
         return self::$all;

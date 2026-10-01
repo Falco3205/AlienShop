@@ -29,6 +29,7 @@
       <?php if (!$gateways): ?><p class="alert alert-error"><?= e(__('Nessun metodo di pagamento attivo.')) ?></p><?php endif ?>
     </fieldset>
     <?php if (!$user): ?><fieldset><legend><?= e(__('Crea un account (opzionale)')) ?></legend><div class="field"><label for="password"><?= e(__('Password')) ?></label><input id="password" type="password" name="password" minlength="8" autocomplete="new-password" placeholder="<?= e(__('Lascia vuoto per ordinare come ospite')) ?>"></div></fieldset><?php endif ?>
+    <?php if (Alien\Services\Modules::on('newsletter')): ?><label style="display:flex;gap:10px;align-items:flex-start;font-weight:400;margin-bottom:10px"><input type="checkbox" name="newsletter" value="1" style="width:auto;margin-top:5px"><span><?= e(__('Voglio ricevere novità e offerte via email (puoi annullare quando vuoi)')) ?></span></label><?php endif ?>
     <label style="display:flex;gap:10px;align-items:flex-start;font-weight:400"><input type="checkbox" name="terms" value="1" required style="width:auto;margin-top:5px"><span><?= __('Accetto i <a href="%s" target="_blank">termini e condizioni</a> e la <a href="%s" target="_blank">privacy policy</a>', e(url('pages/termini-e-condizioni')), e(url('pages/privacy-policy'))) ?></span></label>
   </div>
   <aside class="summary">

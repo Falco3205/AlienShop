@@ -434,6 +434,171 @@ t('Statistiche: visite, carrelli, vendite e abbandoni', function () {
     eq([$r['searches'][0]['term'], (int)$r['searches'][0]['hits'], (int)$r['noResults'][0]['zero']], ['scarpe rosse', 2, 2]);
 });
 
+out("Estensioni\n");
+use Alien\Services\AbandonedCarts;
+use Alien\Services\Backup;
+use Alien\Services\Cron;
+use Alien\Services\Invoices;
+use Alien\Services\Migrator;
+use Alien\Services\Modules;
+use Alien\Services\Newsletter;
+use Alien\Services\Reviews;
+use Alien\Services\StockAlerts;
+
+t('Estensioni: attivazione e valori predefiniti', function () {
+    eq([Modules::on('reviews'), Modules::on('invoices'), Modules::on('nope')], [false, true, false]);
+    Modules::set('reviews', true);
+    Modules::set('newsletter', true);
+    Modules::set('abandoned_cart', true);
+    eq(Modules::on('reviews'), true);
+});
+t('Migrator: idempotente', function () {
+    Settings::set('schema_version', 1);
+    eq(Migrator::needed(), true);
+    Migrator::run();
+    Migrator::run();
+    eq(Migrator::needed(), false);
+});
+$reviewProduct = Catalog::save(['name' => 'Rev prod', 'price' => 1000]);
+t('Recensioni: validazione, moderazione, media e acquisto verificato', function () use ($reviewProduct) {
+    eq(Reviews::submit($reviewProduct, ['rating' => 9, 'author' => 'A', 'body' => 'abcdefghijk'], '1.1.1.1') !== null, true);
+    eq(Reviews::submit($reviewProduct, ['rating' => 5, 'author' => 'A', 'body' => 'corto'], '1.1.1.1') !== null, true);
+    $oid = DB::insert('orders', ['number' => 'RV-1', 'token' => 'tk-rv', 'email' => 'buyer@test.dev', 'status' => 'completed', 'payment_status' => 'paid', 'payment_method' => 'bank', 'total' => 1000, 'created_at' => now(), 'updated_at' => now()]);
+    DB::insert('order_items', ['order_id' => $oid, 'product_id' => $reviewProduct, 'name' => 'Rev prod', 'price' => 1000, 'qty' => 1, 'total' => 1000]);
+    eq(Reviews::submit($reviewProduct, ['rating' => 5, 'author' => 'Buyer', 'email' => 'buyer@test.dev', 'body' => 'Ottimo prodotto davvero'], '2.2.2.2'), null);
+    eq(Reviews::submit($reviewProduct, ['rating' => 3, 'author' => 'Buyer', 'email' => 'buyer@test.dev', 'body' => 'Un secondo commento'], '2.2.2.2') !== null, true, 'doppia recensione');
+    eq(Reviews::forProduct($reviewProduct), [], 'in moderazione non pubblica');
+    $rid = (int)DB::val('SELECT id FROM reviews WHERE product_id = ?', [$reviewProduct]);
+    eq((int)DB::val('SELECT verified FROM reviews WHERE id = ?', [$rid]), 1);
+    Reviews::setStatus($rid, 'approved');
+    eq([(int)Catalog::product($reviewProduct)['rating_count'], (int)Catalog::product($reviewProduct)['rating_avg']], [1, 50]);
+    Reviews::submit($reviewProduct, ['rating' => 4, 'author' => 'C', 'body' => 'Buono nel complesso'], '3.3.3.3');
+    Reviews::setStatus((int)DB::val('SELECT MAX(id) FROM reviews'), 'approved');
+    eq((int)Catalog::product($reviewProduct)['rating_avg'], 45);
+    for ($i = 0; $i < 3; $i++) { Reviews::submit($reviewProduct, ['rating' => 4, 'author' => 'S' . $i, 'body' => 'spam spam spam spam', 'email' => "s$i@x.dev"], '9.9.9.9'); }
+    eq(Reviews::submit($reviewProduct, ['rating' => 4, 'author' => 'S', 'body' => 'spam spam spam spam'], '9.9.9.9') !== null, true, 'rate limit per IP');
+});
+t('Recensioni: richiesta dopo la spedizione, una sola volta', function () {
+    $oid = (int)DB::val("SELECT id FROM orders WHERE number = 'RV-1'");
+    DB::update('orders', ['updated_at' => date('Y-m-d H:i:s', time() - 10 * 86400)], 'id = ?', [$oid]);
+    eq(Reviews::sendRequests(), 1);
+    eq(Reviews::sendRequests(), 0);
+});
+t('Newsletter: doppio opt-in, campagna in coda e invio', function () {
+    eq(Newsletter::subscribe('nope'), __('Inserisci un indirizzo email valido.'));
+    eq(Newsletter::subscribe('Fan@Test.dev'), null);
+    $row = DB::row("SELECT * FROM subscribers WHERE email = 'fan@test.dev'");
+    eq($row['status'], 'pending');
+    eq(Newsletter::campaign('Ciao', '<p>x</p>'), 0, 'i pending non ricevono');
+    eq(Newsletter::confirm($row['token']), true);
+    eq(Newsletter::campaign('Ciao', '<p>Offerta</p><script>x</script>'), 1);
+    $body = (string)DB::val("SELECT body FROM mail_queue WHERE campaign LIKE 'c%' ORDER BY id DESC LIMIT 1");
+    eq(str_contains($body, '/newsletter/unsubscribe/' . $row['token']) && !str_contains($body, '<script>'), true);
+    Settings::set('mail_driver', 'log');
+    eq(Cron::sendQueue() >= 1, true);
+    eq(Newsletter::unsubscribe($row['token']), true);
+    eq(Newsletter::campaign('Ciao', '<p>x</p>'), 0);
+    eq(str_contains(Newsletter::csv(), 'fan@test.dev'), true);
+});
+t('Carrelli abbandonati: cattura, promemoria, recupero', function () {
+    $pid = Catalog::save(['name' => 'Cart prod', 'price' => 2500]);
+    Cart::clear();
+    Cart::add($pid, 0, [], 2);
+    AbandonedCarts::capture('lead@test.dev');
+    AbandonedCarts::capture('lead@test.dev');
+    eq((int)DB::val("SELECT COUNT(*) FROM abandoned_carts WHERE email = 'lead@test.dev'"), 1, 'upsert');
+    eq(AbandonedCarts::sendReminders(), 0, 'troppo presto');
+    DB::exec("UPDATE abandoned_carts SET updated_at = ? WHERE email = 'lead@test.dev'", [date('Y-m-d H:i:s', time() - 3 * 3600)]);
+    DB::insert('coupons', ['code' => 'COMEBACK', 'type' => 'percent', 'value' => 10, 'min_subtotal' => 0, 'max_uses' => 0, 'used' => 0, 'free_shipping' => 0, 'active' => 1]);
+    Settings::set('abandoned_coupon', 'COMEBACK');
+    eq(AbandonedCarts::sendReminders(), 1);
+    eq(AbandonedCarts::sendReminders(), 0, 'una sola volta');
+    $token = (string)DB::val("SELECT token FROM abandoned_carts WHERE email = 'lead@test.dev'");
+    Cart::clear();
+    eq(AbandonedCarts::restore($token), true);
+    eq([Cart::count(), Cart::totals()['discount']], [2, 500]);
+    AbandonedCarts::orderPlaced('lead@test.dev');
+    eq(AbandonedCarts::stats()['recovered'], 1);
+    Cart::clear();
+});
+t('Fatture: numerazione annuale progressiva, PDF e CSV', function () {
+    $o1 = Orders::find((int)DB::val("SELECT id FROM orders WHERE number = 'RV-1'"));
+    $o1 = Invoices::assign($o1);
+    eq($o1['invoice_number'], date('Y') . '/0001');
+    eq(Invoices::assign($o1)['invoice_number'], date('Y') . '/0001', 'idempotente');
+    $o2 = Invoices::assign(Orders::find((int)DB::val("SELECT id FROM orders WHERE number = 'ST-1'")));
+    eq($o2['invoice_number'], date('Y') . '/0002');
+    $pdf = Invoices::pdf($o2);
+    eq([str_starts_with($pdf, '%PDF-1.4'), str_ends_with($pdf, '%%EOF'), str_contains($pdf, 'Totale')], [true, true, true]);
+    eq(str_contains(Invoices::csv(date('Y-01-01'), date('Y-12-31')), $o2['invoice_number']), true);
+    Settings::set('invoice_prefix', 'FT-');
+    eq(Invoices::assign(Orders::find((int)DB::val("SELECT id FROM orders WHERE number = 'T-1001'")))['invoice_number'], 'FT-' . date('Y') . '/0001');
+    Settings::set('invoice_prefix', '');
+    eq(Alien\Core\Mailer::send('c@test.dev', 'Fattura', '<p>x</p>', [['name' => 'a b.pdf', 'data' => $pdf, 'type' => 'application/pdf']]), true);
+});
+t('Avvisi disponibilità: coda al rifornimento', function () {
+    Modules::set('stock_alerts', true);
+    $pid = Catalog::save(['name' => 'Esaurito', 'price' => 500, 'manage_stock' => 1, 'stock_qty' => 0]);
+    eq((int)Catalog::product($pid)['in_stock'], 0);
+    eq(StockAlerts::subscribe($pid, 'wait@test.dev'), null);
+    StockAlerts::subscribe($pid, 'wait@test.dev');
+    eq((int)DB::val('SELECT COUNT(*) FROM stock_alerts WHERE product_id = ?', [$pid]), 1);
+    $before = (int)DB::val('SELECT COUNT(*) FROM mail_queue');
+    Catalog::save(['name' => 'Esaurito', 'price' => 500, 'manage_stock' => 1, 'stock_qty' => 5], $pid);
+    eq((int)DB::val('SELECT COUNT(*) FROM mail_queue') - $before, 1);
+    eq((int)DB::val('SELECT COUNT(*) FROM stock_alerts WHERE product_id = ?', [$pid]), 0);
+});
+t('Mollie: pagamento, ritorno, webhook e rimborso', function () {
+    Settings::setMany(['pay_mollie_enabled' => 1, 'pay_mollie_api_key' => 'test_x']);
+    Cart::clear();
+    $pid = Catalog::save(['name' => 'Mollie prod', 'price' => 1234]);
+    Cart::add($pid, 0, [], 1);
+    $lines = Cart::lines();
+    $addr = ['name' => 'A', 'address' => 'B', 'city' => 'C', 'zip' => '1', 'country' => 'IT'];
+    $o = Orders::create($lines, Cart::totals($lines), ['email' => 'm@test.dev', 'billing' => $addr, 'shipping' => $addr], 'mollie', null);
+    Cart::clear();
+    $sent = null;
+    Http::$fake = function ($m, $url, $body) use (&$sent, $o) {
+        if ($m === 'POST' && str_ends_with($url, '/payments')) {
+            $sent = json_decode((string)$body, true);
+            return ['status' => 201, 'body' => '', 'error' => '', 'json' => ['id' => 'tr_abc123', '_links' => ['checkout' => ['href' => 'https://pay.mollie.com/x']]]];
+        }
+        if ($m === 'POST') {
+            return ['status' => 201, 'body' => '', 'error' => '', 'json' => ['status' => 'queued']];
+        }
+        return ['status' => 200, 'body' => '', 'error' => '', 'json' => ['id' => 'tr_abc123', 'status' => 'paid', 'amount' => ['currency' => 'EUR', 'value' => number_format($o['total'] / 100, 2, '.', '')], 'metadata' => ['order_token' => $o['token']]]];
+    };
+    $g = new Alien\Payments\MollieGateway();
+    $r = $g->start($o);
+    eq([$r['redirect'], $r['ref'], $sent['amount']['value']], ['https://pay.mollie.com/x', 'tr_abc123', number_format($o['total'] / 100, 2, '.', '')]);
+    DB::update('orders', ['payment_ref' => 'tr_abc123'], 'id = ?', [$o['id']]);
+    $g->handleWebhook(new Request('POST', '/webhooks/mollie', [], ['id' => 'tr_abc123'], [], []));
+    eq(Orders::find((int)$o['id'])['payment_status'], 'paid');
+    eq($g->refund(Orders::find((int)$o['id'])), null);
+    Http::$fake = null;
+});
+t('Filtri per attributo e faccette', function () {
+    $r = Catalog::lookup(['attrs' => ['Taglia' => '42'], 'status' => 'active']);
+    eq(count(array_filter($r['items'], static fn($p) => $p['name'] === 'Sneaker Max')), 1);
+    eq(Catalog::lookup(['attrs' => ['Taglia' => '99']])['total'], 0);
+    eq(Catalog::lookup(['attrs' => ['Taglia' => '42', 'Colore' => 'Blu']])['total'] >= 1, true);
+    $f = Catalog::facets(null);
+    eq(isset($f['Taglia']) && array_column($f['Taglia'], 'value') !== [], true);
+});
+t('Backup: database e archivio completo', function () {
+    [$name, $path] = Backup::databaseFile();
+    eq([is_file($path), filesize($path) > 1000, str_ends_with($name, '.sqlite')], [true, true, true]);
+    @unlink($path);
+    if (Backup::zipAvailable()) {
+        $zip = Backup::fullArchive();
+        $z = new ZipArchive();
+        eq($z->open($zip), true);
+        eq(count(array_filter(range(0, $z->numFiles - 1), fn($i) => str_starts_with($z->getNameIndex($i), 'database/'))), 1);
+        $z->close();
+        @unlink($zip);
+    }
+});
+
 out("\n$passed ok, $failed falliti\n");
 array_map('unlink', glob($tmp . '/*') ?: []);
 @rmdir($tmp);

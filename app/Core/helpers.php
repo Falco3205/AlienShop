@@ -98,6 +98,9 @@ function pull_flash(): array
     Session::start();
     $f = $_SESSION['_flash'] ?? [];
     unset($_SESSION['_flash']);
+    if ($f) {
+        $GLOBALS['as_flash_shown'] = true;
+    }
     return $f;
 }
 

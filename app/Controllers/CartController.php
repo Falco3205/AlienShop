@@ -5,6 +5,7 @@ namespace Alien\Controllers;
 
 use Alien\Core\Request;
 use Alien\Core\Response;
+use Alien\Services\AbandonedCarts;
 use Alien\Services\Cart;
 use Alien\Services\Seo;
 
@@ -16,6 +17,14 @@ final class CartController extends Controller
         Seo::set(['title' => __('Carrello')]);
         Seo::noindex();
         return $this->noStore($this->render('cart', ['lines' => $lines, 'totals' => Cart::totals($lines)]));
+    }
+
+    public function recover(Request $req, array $params): Response
+    {
+        if (!AbandonedCarts::restore($params['token'])) {
+            flash('error', __('Il link non è più valido.'));
+        }
+        return Response::redirect('cart');
     }
 
     public function add(Request $req): Response

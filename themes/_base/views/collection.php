@@ -11,7 +11,15 @@
         <?php if ($c['children']): ?><ul style="margin:4px 0 0 14px"><?php foreach ($c['children'] as $s): ?><li><a href="<?= e(url('collections/' . $s['slug'])) ?>" class="<?= $slug === $s['slug'] ? 'active' : '' ?>"><?= e($s['name']) ?></a></li><?php endforeach ?></ul><?php endif ?></li>
       <?php endforeach ?>
     </ul>
+    <?php foreach ($facets as $facetName => $values): ?>
+      <h3><?= e($facetName) ?></h3><ul>
+      <?php foreach ($values as $fv): $q = $_GET; unset($q['page']); $on = ($activeAttrs[$facetName] ?? null) === $fv['value'];
+          if ($on) { unset($q['attr'][$facetName]); if (empty($q['attr'])) { unset($q['attr']); } } else { $q['attr'][$facetName] = $fv['value']; } ?>
+        <li><a href="<?= e($base . ($q ? '?' . http_build_query($q) : '')) ?>" class="<?= $on ? 'active' : '' ?>" rel="nofollow"><?= $on ? '✓ ' : '' ?><?= e($fv['value']) ?> <small class="muted">(<?= (int)$fv['n'] ?>)</small></a></li>
+      <?php endforeach ?></ul>
+    <?php endforeach ?>
     <form method="get" action="<?= e($base) ?>">
+      <?php foreach ($activeAttrs as $an => $av): ?><input type="hidden" name="attr[<?= e($an) ?>]" value="<?= e($av) ?>"><?php endforeach ?>
       <h3><?= e(__('Prezzo')) ?></h3>
       <div class="row"><input type="number" name="min" min="0" step="1" placeholder="Min" value="<?= e($_GET['min'] ?? '') ?>" aria-label="Min"><input type="number" name="max" min="0" step="1" placeholder="Max" value="<?= e($_GET['max'] ?? '') ?>" aria-label="Max"></div>
       <?php if (!empty($_GET['sort'])): ?><input type="hidden" name="sort" value="<?= e($_GET['sort']) ?>"><?php endif ?>

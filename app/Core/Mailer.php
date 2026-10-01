@@ -5,22 +5,35 @@ namespace Alien\Core;
 
 final class Mailer
 {
-    public static function send(string $to, string $subject, string $html): bool
+    public static function send(string $to, string $subject, string $html, array $attachments = []): bool
     {
         $from = (string)Settings::get('mail_from', Settings::get('store_email', 'noreply@localhost'));
         $fromName = (string)Settings::get('store_name', 'AlienShop');
         $text = trim(html_entity_decode(strip_tags(preg_replace('#<br\s*/?>|</p>|</tr>#i', "\n", $html) ?? $html)));
         $boundary = 'b' . Str::randomToken(8);
-        $headers = [
-            'From: ' . self::encode($fromName) . ' <' . $from . '>',
-            'MIME-Version: 1.0',
-            'Content-Type: multipart/alternative; boundary="' . $boundary . '"',
-        ];
-        $body = "--$boundary\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n"
+        $alt = "--$boundary\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n"
             . chunk_split(base64_encode($text))
             . "--$boundary\r\nContent-Type: text/html; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n"
             . chunk_split(base64_encode($html))
             . "--$boundary--";
+        if ($attachments) {
+            $outer = 'm' . Str::randomToken(8);
+            $body = "--$outer\r\nContent-Type: multipart/alternative; boundary=\"$boundary\"\r\n\r\n" . $alt . "\r\n";
+            foreach ($attachments as $a) {
+                $name = preg_replace('/[^A-Za-z0-9._-]/', '_', (string)$a['name']);
+                $body .= "--$outer\r\nContent-Type: " . ($a['type'] ?? 'application/octet-stream') . "; name=\"$name\"\r\nContent-Transfer-Encoding: base64\r\nContent-Disposition: attachment; filename=\"$name\"\r\n\r\n" . chunk_split(base64_encode((string)$a['data']));
+            }
+            $body .= "--$outer--";
+            $contentType = 'multipart/mixed; boundary="' . $outer . '"';
+        } else {
+            $body = $alt;
+            $contentType = 'multipart/alternative; boundary="' . $boundary . '"';
+        }
+        $headers = [
+            'From: ' . self::encode($fromName) . ' <' . $from . '>',
+            'MIME-Version: 1.0',
+            'Content-Type: ' . $contentType,
+        ];
 
         $driver = (string)Settings::get('mail_driver', 'mail');
         try {

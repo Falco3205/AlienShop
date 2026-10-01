@@ -144,6 +144,7 @@ final class Installer
             'pay_bank_instructions' => $locale === 'en' ? "Please transfer the total to the IBAN provided by email.\nYour order ships when payment is received." : "Effettua il bonifico all'IBAN che riceverai via email.\nL'ordine verrà spedito alla ricezione del pagamento.",
             'installed_at' => now(),
             'version' => ALIEN_VERSION,
+            'schema_version' => Migrator::VERSION,
         ]);
         IndexNow::key();
 
@@ -169,7 +170,13 @@ final class Installer
             $sql
         );
         foreach (array_filter(array_map('trim', explode(';', $sql))) as $statement) {
-            $pdo->exec($statement);
+            try {
+                $pdo->exec($statement);
+            } catch (\PDOException $e) {
+                if (!preg_match('/already exists|Duplicate key name|duplicate column/i', $e->getMessage())) {
+                    throw $e;
+                }
+            }
         }
     }
 

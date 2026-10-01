@@ -138,6 +138,9 @@ final class Orders
         ], 'id = ?', [$order['id']]);
         self::event((int)$order['id'], __('Pagamento ricevuto (%s).', $order['payment_method']));
         self::notify(self::find((int)$order['id']));
+        if (Modules::on('invoices') && (string)Settings::get('invoices_auto', '0') === '1') {
+            Invoices::sendToCustomer(self::find((int)$order['id']));
+        }
     }
 
     public static function markFailed(array $order, string $reason = ''): void

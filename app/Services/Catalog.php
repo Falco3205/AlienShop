@@ -104,6 +104,10 @@ final class Catalog
             $where[] = 'p.price_min <= ?';
             $params[] = (int)$filters['max'];
         }
+        foreach ((array)($filters['attrs'] ?? []) as $name => $value) {
+            $where[] = 'EXISTS (SELECT 1 FROM product_attributes pa JOIN attribute_values av ON av.attribute_id = pa.id WHERE pa.product_id = p.id AND pa.name = ? AND av.value = ?)';
+            array_push($params, (string)$name, (string)$value);
+        }
         if (!empty($filters['featured'])) {
             $where[] = 'p.featured = 1';
         }
@@ -129,6 +133,22 @@ final class Catalog
         $page = max(1, (int)($filters['page'] ?? 1));
         $items = DB::all("SELECT {$distinct}p.* FROM products p$join$sqlWhere ORDER BY $order LIMIT $per OFFSET " . (($page - 1) * $per), $params);
         return ['items' => $items, 'total' => $total, 'page' => $page, 'per' => $per, 'pages' => (int)ceil($total / $per)];
+    }
+
+    public static function facets(?int $categoryId = null): array
+    {
+        $join = '';
+        $params = [];
+        if ($categoryId) {
+            $ids = self::categoryWithChildren($categoryId);
+            $join = ' JOIN product_categories pc ON pc.product_id = p.id AND pc.category_id IN (' . DB::marks($ids) . ')';
+            $params = $ids;
+        }
+        $out = [];
+        foreach (DB::all("SELECT pa.name, av.value, COUNT(DISTINCT p.id) AS n FROM products p$join JOIN product_attributes pa ON pa.product_id = p.id JOIN attribute_values av ON av.attribute_id = pa.id WHERE p.status = 'active' GROUP BY pa.name, av.value ORDER BY pa.name, av.value", $params) as $r) {
+            $out[$r['name']][] = ['value' => (string)$r['value'], 'n' => (int)$r['n']];
+        }
+        return array_filter($out, static fn($v) => count($v) >= 2 && count($v) <= 24);
     }
 
     public static function categoryWithChildren(int $id): array
@@ -407,12 +427,16 @@ final class Catalog
             }
         }
         $image = $p['images'][0]['path'] ?? null;
+        $wasOut = !(int)$p['in_stock'];
         DB::update('products', [
             'price_min' => $min,
             'price_max' => $max,
             'in_stock' => $inStock ? 1 : 0,
             'image' => $image,
         ], 'id = ?', [$id]);
+        if ($wasOut && $inStock && $p['status'] === 'active' && Modules::on('stock_alerts')) {
+            StockAlerts::notify($id);
+        }
     }
 
     public static function addImage(int $productId, string $path, string $alt = ''): void

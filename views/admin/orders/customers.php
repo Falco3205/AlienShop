@@ -1,3 +1,3 @@
 <div class="card" style="padding:0"><table><thead><tr><th><?= e(__('Nome')) ?></th><th>Email</th><th><?= e(__('Registrato')) ?></th><th><?= e(__('Ordini')) ?></th><th class="right"><?= e(__('Speso')) ?></th></tr></thead><tbody>
-<?php foreach ($rows as $r): ?><tr><td><?= e($r['name']) ?></td><td><?= e($r['email']) ?></td><td><?= e(a_dt($r['created_at'])) ?></td><td><?= (int)$r['orders'] ?></td><td class="right"><?= e(money($r['spent'])) ?></td></tr><?php endforeach ?>
+<?php foreach ($rows as $r): ?><tr><td><?= e($r['name']) ?></td><td><a href="<?= e(url('admin/orders?q=' . urlencode($r['email']))) ?>"><?= e($r['email']) ?></a></td><td><?= e(a_dt($r['created_at'])) ?></td><td><?= (int)$r['orders'] ?></td><td class="right"><?= e(money($r['spent'])) ?></td></tr><?php endforeach ?>
 <?php if (!$rows): ?><tr><td colspan="5" class="muted"><?= e(__('Nessun cliente registrato.')) ?></td></tr><?php endif ?></tbody></table></div>

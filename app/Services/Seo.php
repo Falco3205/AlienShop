@@ -151,6 +151,8 @@ final class Seo
             'image' => $images ?: null,
             'brand' => $p['vendor'] !== '' ? ['@type' => 'Brand', 'name' => $p['vendor']] : null,
             'offers' => $offer,
+            'aggregateRating' => ((int)($p['rating_count'] ?? 0) > 0 && \Alien\Services\Modules::on('reviews'))
+                ? ['@type' => 'AggregateRating', 'ratingValue' => number_format((int)$p['rating_avg'] / 10, 1, '.', ''), 'reviewCount' => (int)$p['rating_count']] : null,
         ];
         self::schema(array_filter($schema, static fn($v) => $v !== null && $v !== ''));
         self::breadcrumbs(self::productTrail($p));

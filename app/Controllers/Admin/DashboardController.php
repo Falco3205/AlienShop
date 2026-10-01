@@ -40,7 +40,7 @@ final class DashboardController extends AdminController
 
     private function checklist(): array
     {
-        $paymentsOn = Settings::get('pay_stripe_enabled') || Settings::get('pay_paypal_enabled');
+        $paymentsOn = Settings::get('pay_stripe_enabled') || Settings::get('pay_paypal_enabled') || Settings::get('pay_mollie_enabled');
         $items = [
             [(int)DB::val("SELECT COUNT(*) FROM products WHERE sku NOT LIKE 'DEMO-%'") > 0, __('Aggiungi i tuoi prodotti'), __('Creali a mano oppure importali da WooCommerce o Shopify.'), 'admin/products/new'],
             [(bool)Settings::get('theme_customized'), __('Personalizza l\'aspetto'), __('Scegli il tema, il logo e i colori del tuo negozio.'), 'admin/themes'],
