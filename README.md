@@ -17,6 +17,71 @@ PHP 8.1+ con `pdo_sqlite` **o** `pdo_mysql`, `mbstring`, `gd` (con WebP), `curl`
 
 Dopo l'installazione `/install` non è più raggiungibile (`storage/installed.lock`).
 
+## Installazione su VPS da GitHub (Ubuntu/Debian + Nginx)
+
+Comandi da eseguire sul server come utente con `sudo`. Sostituisci `shop.example.com` con il tuo dominio.
+
+```bash
+# 1. Pacchetti (PHP 8.3 con le estensioni richieste, Nginx, Git; MySQL è facoltativo, SQLite funziona senza)
+sudo apt update
+sudo apt install -y nginx git unzip php-fpm php-cli php-sqlite3 php-mysql php-mbstring php-gd php-curl php-intl php-xml php-zip
+# opzionale: sudo apt install -y mariadb-server
+
+# 2. Scarica il pacchetto da GitHub
+sudo git clone -b claude/cool-ptolemy-ejjd8w https://github.com/Falco3205/AlienShop.git /var/www/alienshop
+# (dopo il merge su main usa: -b main)
+sudo chown -R www-data:www-data /var/www/alienshop
+
+# 3. Nginx: copia la configurazione inclusa e adatta dominio e versione di PHP
+sudo cp /var/www/alienshop/docs/nginx.conf /etc/nginx/sites-available/alienshop
+sudo sed -i 's/example.com/shop.example.com/' /etc/nginx/sites-available/alienshop
+ls /run/php/            # controlla il nome del socket e correggi php8.3-fpm.sock se diverso
+sudo ln -s /etc/nginx/sites-available/alienshop /etc/nginx/sites-enabled/alienshop
+sudo nginx -t && sudo systemctl reload nginx
+
+# 4. HTTPS gratuito con Let's Encrypt
+sudo apt install -y certbot python3-certbot-nginx
+sudo certbot --nginx -d shop.example.com
+```
+
+Poi apri `https://shop.example.com/install` e completa il wizard. Se usi MySQL, crea prima database e utente:
+
+```bash
+sudo mysql -e "CREATE DATABASE alienshop CHARACTER SET utf8mb4; CREATE USER 'alienshop'@'localhost' IDENTIFIED BY 'una-password-forte'; GRANT ALL ON alienshop.* TO 'alienshop'@'localhost';"
+```
+
+Nel wizard scegli MySQL, host `localhost`, database/utente/password appena creati.
+
+Per caricare file grandi (immagini, CSV di import) alza i limiti in `/etc/php/8.3/fpm/php.ini` (`upload_max_filesize = 64M`, `post_max_size = 64M`) e in Nginx (`client_max_body_size 64M;` nel blocco `server`), poi `sudo systemctl restart php8.3-fpm nginx`.
+
+### Importare i prodotti da WooCommerce o Shopify sul VPS
+
+Dal pannello: **Admin → Import / Export**. Per cataloghi grandi usa la riga di comando (nessun limite di tempo del browser):
+
+```bash
+scp prodotti.csv utente@shop.example.com:/tmp/prodotti.csv          # dal tuo computer
+cd /var/www/alienshop
+sudo -u www-data php bin/console import:woocommerce /tmp/prodotti.csv   # oppure import:shopify
+sudo -u www-data php bin/console cache:clear
+```
+
+Le immagini vengono scaricate dagli URL del CSV; aggiungi `--no-images` per saltarle e `--no-update` per non aggiornare i prodotti già presenti. L'import è idempotente: rilanciarlo aggiorna invece di duplicare. Per esportare: `php bin/console export:woocommerce > woo.csv` (o `export:shopify`).
+
+### Aggiornare all'ultima versione
+
+```bash
+cd /var/www/alienshop
+sudo -u www-data git pull
+sudo -u www-data php bin/console migrate
+sudo -u www-data php bin/console cache:clear
+```
+
+`config/config.php`, `storage/` e `public/uploads/` non sono tracciati da Git e non vengono toccati. Fai un backup prima (`sudo -u www-data php bin/console backup:create`).
+
+### Attività pianificate (facoltativo)
+
+Funzionano anche senza cron; per più precisione: `echo '* * * * * www-data php /var/www/alienshop/bin/console cron:run' | sudo tee /etc/cron.d/alienshop`.
+
 ## Funzionalità
 
 - **Contatti e tracciamento ordine**: pagine `/contact` e `/track` con anti-spam e limite di richieste.
