@@ -86,10 +86,11 @@ final class Orders
         if (!(int)$product['manage_stock']) {
             return;
         }
-        if ($variant) {
-            DB::exec('UPDATE variants SET stock = stock + ? WHERE id = ?', [$delta, $variant['id']]);
-        } else {
-            DB::exec('UPDATE products SET stock_qty = stock_qty + ? WHERE id = ?', [$delta, $product['id']]);
+        [$table, $col, $id] = $variant ? ['variants', 'stock', $variant['id']] : ['products', 'stock_qty', $product['id']];
+        $guard = $delta < 0 ? " AND $col >= ?" : '';
+        $params = $delta < 0 ? [$delta, $id, -$delta] : [$delta, $id];
+        if (DB::exec("UPDATE $table SET $col = $col + ? WHERE id = ?$guard", $params) === 0 && $delta < 0) {
+            throw new OutOfStock($product['name'] ?? '');
         }
         Catalog::refreshDerived((int)$product['id']);
     }

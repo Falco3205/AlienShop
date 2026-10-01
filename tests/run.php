@@ -599,6 +599,48 @@ t('Backup: database e archivio completo', function () {
     }
 });
 
+out("Revisione e sicurezza\n");
+t('sanitizeHtml: rimuove script, handler e schemi pericolosi', function () {
+    $h = Str::sanitizeHtml('<p onclick="x()">Ciao <b>mondo</b></p><script>alert(1)</script><a href="javascript:alert(1)">x</a><a href="&#106;avascript:alert(1)">y</a><img src="a.jpg" onerror="x()"><iframe src="//e"></iframe><a href="https://ok.it" target="_blank">z</a>');
+    eq(preg_match('/script|onclick|onerror|javascript|iframe/i', $h), 0, $h);
+    eq(str_contains($h, '<b>mondo</b>') && str_contains($h, 'https://ok.it') && str_contains($h, 'noopener'), true, $h);
+});
+t('Secret: cifratura reversibile e valori in chiaro tollerati', function () {
+    $sealed = Alien\Core\Secret::seal('sk_live_123');
+    eq($sealed !== 'sk_live_123', true);
+    eq(Alien\Core\Secret::open($sealed), 'sk_live_123');
+    eq(Alien\Core\Secret::open('plain'), 'plain');
+});
+t('Http: indirizzi privati e loopback rifiutati', function () {
+    foreach (['http://127.0.0.1/x', 'http://10.0.0.5/', 'http://192.168.1.1/', 'http://169.254.169.254/latest', 'http://[::1]/', 'file:///etc/passwd', 'ftp://example.com/a'] as $u) {
+        eq(Http::publicIp($u), null, $u);
+        eq(Http::download($u), null, $u);
+    }
+    eq(Http::publicIp('http://8.8.8.8/'), '8.8.8.8');
+});
+t('ordine: scorte insufficienti bloccano l\'ordine senza scalare', function () {
+    $pid = Catalog::save(['name' => 'Ultimo pezzo', 'price' => 500, 'manage_stock' => 1, 'stock_qty' => 1]);
+    Cart::clear();
+    Cart::add($pid, 0, [], 1);
+    $lines = Cart::lines();
+    $totals = Cart::totals($lines);
+    DB::exec('UPDATE products SET stock_qty = 0 WHERE id = ?', [$pid]);
+    $addr = ['name' => 'A', 'address' => 'B', 'city' => 'C', 'zip' => '1', 'country' => 'IT'];
+    $before = (int)DB::val('SELECT COUNT(*) FROM orders');
+    $thrown = false;
+    try {
+        Orders::create($lines, $totals, ['email' => 'r@test.dev', 'billing' => $addr, 'shipping' => $addr], 'bank', null);
+    } catch (Alien\Services\OutOfStock) {
+        $thrown = true;
+    }
+    eq($thrown, true);
+    eq((int)DB::val('SELECT COUNT(*) FROM orders'), $before, 'transazione annullata');
+    eq((int)DB::val('SELECT stock_qty FROM products WHERE id = ?', [$pid]), 0);
+    Cart::clear();
+});
+t('ricerca: caratteri jolly LIKE neutralizzati', function () {
+    eq(DB::like('50%_off!'), '%50!%!_off!!%');
+});
 out("Fatturazione elettronica\n");
 use Alien\EInvoice\Fiscal;
 use Alien\EInvoice\InvoiceData;

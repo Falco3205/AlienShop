@@ -21,6 +21,9 @@ final class Installer
             ['GD (immagini WebP)', extension_loaded('gd'), true],
             ['cURL (pagamenti, import immagini)', extension_loaded('curl'), true],
             ['OpenSSL', extension_loaded('openssl'), true],
+            ['Sodium (cifratura dei segreti)', extension_loaded('sodium'), true],
+            ['DOM (pulizia HTML, fatturazione elettronica)', extension_loaded('dom'), true],
+            ['ZIP (backup completo)', extension_loaded('zip'), false],
             ['intl (slug SEO)', extension_loaded('intl'), false],
             ['config/ scrivibile', $writable(ROOT . '/config'), true],
             ['storage/ scrivibile', $writable(ROOT . '/storage') && $writable(ROOT . '/storage/cache') && $writable(ROOT . '/storage/logs'), true],
@@ -122,7 +125,7 @@ final class Installer
         ]);
 
         $locale = ($d['lang'] ?? 'it') === 'en' ? 'en' : 'it';
-        $currency = in_array($d['currency'] ?? 'EUR', Money::currencies(), true) ? $d['currency'] : 'EUR';
+        $currency = in_array($d['currency'] ?? 'EUR', Money::currencies(), true) ? (string)($d['currency'] ?? 'EUR') : 'EUR';
         Settings::setMany([
             'store_name' => trim((string)$d['store_name']),
             'store_email' => trim((string)$d['store_email']),

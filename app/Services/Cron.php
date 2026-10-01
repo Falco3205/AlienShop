@@ -22,8 +22,14 @@ final class Cron
         if (!@touch($file)) {
             return;
         }
+        ignore_user_abort(true);
         if (function_exists('fastcgi_finish_request')) {
             @fastcgi_finish_request();
+        } else {
+            while (ob_get_level() > 0) {
+                @ob_end_flush();
+            }
+            flush();
         }
         try {
             self::run();

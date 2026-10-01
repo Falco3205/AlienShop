@@ -6,6 +6,7 @@ namespace Alien\Core;
 use Alien\Controllers\Admin;
 use Alien\Controllers\AccountController;
 use Alien\Controllers\CartController;
+use Alien\Controllers\ContactController;
 use Alien\Controllers\CheckoutController;
 use Alien\Controllers\InstallController;
 use Alien\Controllers\NewsletterController;
@@ -106,6 +107,10 @@ final class App
         $r->get('/newsletter/confirm/{token}', [NewsletterController::class, 'confirm']);
         $r->get('/newsletter/unsubscribe/{token}', [NewsletterController::class, 'unsubscribe']);
         $r->post('/products/{slug}/notify', [ShopController::class, 'notify']);
+        $r->get('/contact', [ContactController::class, 'form']);
+        $r->post('/contact', [ContactController::class, 'send']);
+        $r->get('/track', [ContactController::class, 'trackForm']);
+        $r->post('/track', [ContactController::class, 'track']);
         $r->get('/wishlist', [ShopController::class, 'wishlistPage']);
         $r->get('/wishlist/cards', [ShopController::class, 'wishlistCards']);
         $r->get('/search', [ShopController::class, 'search']);

@@ -19,6 +19,7 @@ Dopo l'installazione `/install` non è più raggiungibile (`storage/installed.lo
 
 ## Funzionalità
 
+- **Contatti e tracciamento ordine**: pagine `/contact` e `/track` con anti-spam e limite di richieste.
 - **Prodotti**: semplici o variabili, immagini multiple (ottimizzate in WebP, 3 dimensioni, `srcset`), categorie annidate, tag, marca, SKU, scorte, bozze, in evidenza.
 - **Attributi e variazioni di prezzo**: per ogni attributo si elencano i valori con delta di prezzo (`XL|+2.00`). Le varianti sono generate da tutte le combinazioni; il prezzo è `prezzo base + delta` oppure un override per singola variante, con scorte e SKU per variante.
 - **10 temi preinstallati**: Aurora, Midnight, Boutique, Minimal, Vivid, Nature, Tech, Luxe, Pastel, Brutalist. Anteprima, attivazione, colori, logo, hero e CSS personalizzati dal pannello.

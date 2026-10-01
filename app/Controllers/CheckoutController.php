@@ -143,9 +143,13 @@ final class CheckoutController extends Controller
             'city' => $in('city'), 'zip' => $in('zip'), 'state' => $in('state'), 'country' => $country,
         ];
         AbandonedCarts::orderPlaced($email);
-        $order = Orders::create($lines, $totals, [
-            'email' => $email, 'billing' => $address, 'shipping' => $address, 'note' => mb_substr($req->str('note'), 0, 1000),
-        ], $gateway->id(), $user ? (int)$user['id'] : null);
+        try {
+            $order = Orders::create($lines, $totals, [
+                'email' => $email, 'billing' => $address, 'shipping' => $address, 'note' => mb_substr($req->str('note'), 0, 1000),
+            ], $gateway->id(), $user ? (int)$user['id'] : null);
+        } catch (\Alien\Services\OutOfStock $e) {
+            return $this->fail($req, [sprintf(__('"%s" non è più disponibile nella quantità richiesta.'), $e->productName)]);
+        }
 
         if ($req->str('newsletter') === '1' && \Alien\Services\Modules::on('newsletter')) {
             \Alien\Services\Newsletter::subscribe($email, $in('name'), 'checkout');

@@ -434,6 +434,9 @@ final class Catalog
             'in_stock' => $inStock ? 1 : 0,
             'image' => $image,
         ], 'id = ?', [$id]);
+        if ($wasOut === $inStock) {
+            \Alien\Core\Cache::flush();
+        }
         if ($wasOut && $inStock && $p['status'] === 'active' && Modules::on('stock_alerts')) {
             StockAlerts::notify($id);
         }

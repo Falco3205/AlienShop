@@ -5,11 +5,14 @@ namespace Alien\Core;
 
 final class Mailer
 {
-    public static function send(string $to, string $subject, string $html, array $attachments = []): bool
+    public static function send(string $to, string $subject, string $html, array $attachments = [], string $replyTo = ''): bool
     {
         $from = (string)Settings::get('mail_from', Settings::get('store_email', 'noreply@localhost'));
         $fromName = (string)Settings::get('store_name', 'AlienShop');
         [$text, $headers, $body] = self::compose($from, $fromName, $html, $attachments);
+        if ($replyTo !== '' && filter_var($replyTo, FILTER_VALIDATE_EMAIL)) {
+            $headers[] = 'Reply-To: ' . $replyTo;
+        }
 
         $driver = (string)Settings::get('mail_driver', 'mail');
         try {

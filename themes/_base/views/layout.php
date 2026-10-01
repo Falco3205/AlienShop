@@ -62,6 +62,8 @@ $logo = setting('logo');
         <?php foreach (array_slice($nav['categories'], 0, 5) as $c): ?><li><a href="<?= e(url('collections/' . $c['slug'])) ?>"><?= e($c['name']) ?></a></li><?php endforeach ?></ul></div>
       <div><h4><?= e(__('Informazioni')) ?></h4><ul>
         <?php foreach ($nav['footer_pages'] as $p): ?><li><a href="<?= e(url('pages/' . $p['slug'])) ?>"><?= e($p['title']) ?></a></li><?php endforeach ?>
+        <li><a href="<?= e(url('contact')) ?>"><?= e(__('Contatti')) ?></a></li>
+        <li><a href="<?= e(url('track')) ?>"><?= e(__('Traccia ordine')) ?></a></li>
         <li><a href="<?= e(url('account')) ?>"><?= e(__('Il mio account')) ?></a></li>
         <?php if (Alien\Services\Analytics::enabled() && Alien\Services\Analytics::consentRequired()): ?><li><a href="#" data-cookie-settings><?= e(__('Preferenze cookie')) ?></a></li><?php endif ?></ul></div>
     </div>
