@@ -75,7 +75,7 @@ final class Mailer
 
     private static function smtp(string $from, string $to, string $subject, array $headers, string $body, ?array $cfg = null): bool
     {
-        $cfg ??= ['host' => (string)Settings::get('smtp_host'), 'port' => (int)Settings::get('smtp_port', 587), 'secure' => (string)Settings::get('smtp_secure', 'tls'), 'user' => (string)Settings::get('smtp_user'), 'pass' => (string)Settings::get('smtp_pass')];
+        $cfg ??= ['host' => (string)Settings::get('smtp_host'), 'port' => (int)Settings::get('smtp_port', 587), 'secure' => (string)Settings::get('smtp_secure', 'tls'), 'user' => (string)Settings::get('smtp_user'), 'pass' => Secret::open((string)Settings::get('smtp_pass'))];
         $host = (string)$cfg['host'];
         $port = (int)$cfg['port'];
         $secure = (string)$cfg['secure'];

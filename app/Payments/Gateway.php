@@ -34,7 +34,8 @@ abstract class Gateway
 
     public function setting(string $key, mixed $default = null): mixed
     {
-        return Settings::get('pay_' . $this->id() . '_' . $key, $default);
+        $v = Settings::get('pay_' . $this->id() . '_' . $key, $default);
+        return is_string($v) ? \Alien\Core\Secret::open($v) : $v;
     }
 
     public function handleReturn(Request $req, array $order): bool

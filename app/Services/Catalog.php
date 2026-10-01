@@ -92,8 +92,8 @@ final class Catalog
             $params = [...$ids, ...$params];
         }
         if (!empty($filters['q'])) {
-            $like = '%' . str_replace(['%', '_'], ['\\%', '\\_'], (string)$filters['q']) . '%';
-            $where[] = "(p.name LIKE ? ESCAPE '\\' OR p.sku LIKE ? ESCAPE '\\' OR p.tags LIKE ? ESCAPE '\\' OR p.short_description LIKE ? ESCAPE '\\')";
+            $like = DB::like((string)$filters['q']);
+            $where[] = "(p.name LIKE ? ESCAPE '!' OR p.sku LIKE ? ESCAPE '!' OR p.tags LIKE ? ESCAPE '!' OR p.short_description LIKE ? ESCAPE '!')";
             array_push($params, $like, $like, $like, $like);
         }
         if (!empty($filters['min'])) {

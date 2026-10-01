@@ -55,12 +55,91 @@ final class Str
         return bin2hex(random_bytes($bytes));
     }
 
+    private const ALLOWED_TAGS = [
+        'p', 'br', 'hr', 'div', 'span', 'strong', 'b', 'em', 'i', 'u', 's', 'small', 'sup', 'sub', 'mark', 'blockquote', 'pre', 'code',
+        'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li', 'dl', 'dt', 'dd', 'a', 'img', 'figure', 'figcaption',
+        'table', 'thead', 'tbody', 'tfoot', 'tr', 'th', 'td', 'caption',
+    ];
+    private const DROP_TAGS = ['script', 'style', 'iframe', 'frame', 'frameset', 'object', 'embed', 'applet', 'form', 'input', 'button', 'textarea', 'select', 'option', 'link', 'meta', 'base', 'svg', 'math', 'noscript', 'template', 'audio', 'video', 'source', 'canvas', 'title', 'head'];
+    private const ALLOWED_ATTRS = [
+        '*' => ['class', 'title', 'lang', 'dir'],
+        'a' => ['href', 'target', 'rel'],
+        'img' => ['src', 'alt', 'width', 'height', 'loading'],
+        'td' => ['colspan', 'rowspan'], 'th' => ['colspan', 'rowspan', 'scope'],
+        'ol' => ['start', 'type'],
+    ];
+
     public static function sanitizeHtml(string $html): string
     {
-        $html = preg_replace('#<(script|style|iframe|object|embed|form|link|meta)\b[^>]*>.*?</\1>#is', '', $html) ?? '';
-        $html = preg_replace('#<(script|style|iframe|object|embed|form|link|meta)\b[^>]*/?>#is', '', $html) ?? '';
-        $html = preg_replace('#\son\w+\s*=\s*("[^"]*"|\'[^\']*\'|[^\s>]+)#i', '', $html) ?? '';
-        $html = preg_replace('#(href|src)\s*=\s*(["\'])\s*(javascript|data|vbscript):[^"\']*\2#i', '$1=$2#$2', $html) ?? '';
-        return $html;
+        $html = trim($html);
+        if ($html === '') {
+            return '';
+        }
+        $doc = new \DOMDocument();
+        $prev = libxml_use_internal_errors(true);
+        $doc->loadHTML('<?xml encoding="UTF-8"><div id="as-root">' . $html . '</div>', LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD | LIBXML_NONET);
+        libxml_clear_errors();
+        libxml_use_internal_errors($prev);
+        $root = $doc->getElementById('as-root') ?? $doc->documentElement;
+        if (!$root) {
+            return '';
+        }
+        self::cleanNode($root);
+        $out = '';
+        foreach ($root->childNodes as $child) {
+            $out .= $doc->saveHTML($child);
+        }
+        return trim($out);
+    }
+
+    private static function cleanNode(\DOMNode $node): void
+    {
+        foreach (iterator_to_array($node->childNodes) as $child) {
+            if ($child instanceof \DOMText) {
+                continue;
+            }
+            if (!$child instanceof \DOMElement) {
+                $node->removeChild($child);
+                continue;
+            }
+            $tag = strtolower($child->tagName);
+            if (in_array($tag, self::DROP_TAGS, true)) {
+                $node->removeChild($child);
+                continue;
+            }
+            self::cleanNode($child);
+            if (!in_array($tag, self::ALLOWED_TAGS, true)) {
+                while ($child->firstChild) {
+                    $node->insertBefore($child->firstChild, $child);
+                }
+                $node->removeChild($child);
+                continue;
+            }
+            $allowed = array_merge(self::ALLOWED_ATTRS['*'], self::ALLOWED_ATTRS[$tag] ?? []);
+            foreach (iterator_to_array($child->attributes) as $attr) {
+                $name = strtolower($attr->name);
+                if (!in_array($name, $allowed, true) || !self::attrValueSafe($name, $attr->value)) {
+                    $child->removeAttribute($attr->name);
+                }
+            }
+            if ($tag === 'a' && strtolower($child->getAttribute('target')) === '_blank') {
+                $child->setAttribute('rel', 'noopener noreferrer');
+            }
+        }
+    }
+
+    private static function attrValueSafe(string $name, string $value): bool
+    {
+        if (!in_array($name, ['href', 'src'], true)) {
+            return !preg_match('/[<>]/', $value);
+        }
+        $v = strtolower(preg_replace('/[\x00-\x20\x7f]+/', '', $value) ?? '');
+        if ($v === '' || preg_match('#^(https?:|mailto:|tel:|/|\#|\?|\./|\.\./)#', $v)) {
+            return true;
+        }
+        if ($name === 'src' && preg_match('#^data:image/(png|jpe?g|gif|webp);base64,[a-z0-9+/=]+$#', $v)) {
+            return true;
+        }
+        return !preg_match('#^[a-z][a-z0-9+.\-]*:#', $v);
     }
 }

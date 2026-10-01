@@ -152,7 +152,11 @@ final class SettingsController extends AdminController
                 if (!is_string($value)) {
                     continue;
                 }
-                if ($type === 'password' && $value === '') {
+                if ($type === 'password') {
+                    if ($value === '') {
+                        continue;
+                    }
+                    Settings::set($key, \Alien\Core\Secret::seal(trim($value)));
                     continue;
                 }
                 if ($type === 'checkbox') {

@@ -112,6 +112,11 @@ final class DB
         return self::exec('DELETE FROM ' . $table . ' WHERE ' . $where, $params);
     }
 
+    public static function like(string $term): string
+    {
+        return '%' . str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $term) . '%';
+    }
+
     public static function marks(array $values): string
     {
         return implode(',', array_fill(0, max(1, count($values)), '?'));
