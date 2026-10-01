@@ -28,8 +28,7 @@ sudo apt install -y nginx git unzip php-fpm php-cli php-sqlite3 php-mysql php-mb
 # opzionale: sudo apt install -y mariadb-server
 
 # 2. Scarica il pacchetto da GitHub
-sudo git clone -b claude/cool-ptolemy-ejjd8w https://github.com/Falco3205/AlienShop.git /var/www/alienshop
-# (dopo il merge su main usa: -b main)
+sudo git clone https://github.com/Falco3205/AlienShop.git /var/www/alienshop
 sudo chown -R www-data:www-data /var/www/alienshop
 
 # 3. Nginx: copia la configurazione inclusa e adatta dominio e versione di PHP
