@@ -42,6 +42,22 @@ sudo bash install-alienshop.sh UTENTE_HESTIA shop.example.com tu@example.com "Il
 
 La password dell'amministratore viene generata e stampata a fine installazione (oppure imposti `ALIEN_ADMIN_PASSWORD`). Il dominio deve già puntare al server per il certificato; con `SKIP_SSL=1` salti HTTPS. Lo script si ferma se la cartella del sito contiene già dei file. È pensato per Hestia con Nginx + PHP-FPM e PHP 8.1+ come CLI predefinito; lo script non è stato provato su un server Hestia reale, quindi al primo uso controlla l'output.
 
+### Aggiornamenti automatici da GitHub
+
+Ogni modifica pubblicata su GitHub arriva al negozio dal pannello (**Admin → Aggiornamenti**, un clic su "Aggiorna ora") o da riga di comando:
+
+```bash
+php bin/console update --check     # controlla soltanto
+php bin/console update             # aggiorna (backup del database, migrazioni, cache)
+php bin/console update:rollback    # torna alla versione precedente
+```
+
+- Funziona con **Git** (se il sito è stato clonato) oppure scaricando lo **ZIP** da GitHub (hosting senza Git, richiede l'estensione `zip`).
+- Non toccano mai `config/config.php`, `storage/`, `public/uploads/` (dati, immagini, configurazione). Le modifiche fatte a mano ai file tracciati bloccano l'aggiornamento Git per non perderle.
+- **Automatico**: attiva "Aggiorna automaticamente" e il negozio controlla GitHub ogni giorno. Per l'aggiornamento **immediato** a ogni push, su GitHub aggiungi un webhook (Settings → Webhooks) con URL `https://tuodominio/webhooks/github`, content type `application/json` e il secret mostrato nella pagina Aggiornamenti.
+- Repository privato: inserisci un token GitHub con accesso in sola lettura. Il sito, in Git, usa invece le credenziali del `git remote`.
+- Il server web deve poter scrivere nei file del sito (su Hestia/XAMPP è già così). Su un VPS con file di proprietà di un altro utente, esegui `update` da CLI con quell'utente.
+
 ## Installazione su VPS da GitHub (Ubuntu/Debian + Nginx)
 
 Comandi da eseguire sul server come utente con `sudo`. Sostituisci `shop.example.com` con il tuo dominio.

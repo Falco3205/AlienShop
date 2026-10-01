@@ -136,6 +136,7 @@ final class App
         $r->get('/invoice/{token}', [CheckoutController::class, 'invoice']);
         $r->get('/pay/return/{gateway}', [CheckoutController::class, 'paymentReturn']);
         $r->get('/pay/cancel/{token}', [CheckoutController::class, 'paymentCancel']);
+        $r->post('/webhooks/github', [WebhookController::class, 'github']);
         $r->post('/webhooks/{gateway}', [WebhookController::class, 'handle']);
 
         $r->get('/account', [AccountController::class, 'index']);

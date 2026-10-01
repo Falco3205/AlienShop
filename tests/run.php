@@ -678,6 +678,108 @@ t('email personalizzabili: segnaposto, escape, ripristino, disattivazione', func
 t('ricerca: caratteri jolly LIKE neutralizzati', function () {
     eq(DB::like('50%_off!'), '%50!%!_off!!%');
 });
+out("Aggiornamenti\n");
+$sh = static function (string $cmd): string {
+    return trim((string)shell_exec($cmd . ' 2>&1'));
+};
+t('aggiornamento Git: fast-forward, modifiche locali bloccano, rollback', function () use ($tmp, $sh) {
+    $bare = $tmp . '/up-origin.git';
+    $work = $tmp . '/up-work';
+    $site = $tmp . '/up-site';
+    $g = 'git -c user.email=t@t -c user.name=t';
+    $sh("git init -q --bare -b main $bare");
+    $sh("git clone -q $bare $work");
+    file_put_contents("$work/app.txt", "v1\n");
+    mkdir("$work/app");
+    $sh("cd $work && $g add -A && $g commit -qm v1 && git push -q origin HEAD:main");
+    $sh("git clone -q $bare $site");
+    mkdir("$site/storage", 0777, true);
+    $before = Alien\Services\Updater::currentCommit($site);
+    eq(strlen($before), 40);
+    file_put_contents("$work/app.txt", "v2\n");
+    $sh("cd $work && $g commit -qam v2 && git push -q origin HEAD:main");
+    file_put_contents("$site/app.txt", "locale\n");
+    $r = Alien\Services\Updater::applyGit($site);
+    eq($r['ok'], false, 'modifiche locali');
+    eq(file_get_contents("$site/app.txt"), "locale\n");
+    $sh("cd $site && git checkout -q -- app.txt");
+    $r = Alien\Services\Updater::applyGit($site);
+    eq($r['ok'], true, $r['message']);
+    eq(file_get_contents("$site/app.txt"), "v2\n");
+    eq(Alien\Services\Updater::state($site)['previous'], $before);
+});
+t('aggiornamento ZIP: sostituisce il codice, conserva dati, rimuove file obsoleti', function () use ($tmp) {
+    $site = $tmp . '/zip-site';
+    foreach (['app', 'public/uploads', 'storage', 'config'] as $d) {
+        mkdir("$site/$d", 0777, true);
+    }
+    file_put_contents("$site/app/bootstrap.php", 'old');
+    file_put_contents("$site/app/old.php", 'old');
+    file_put_contents("$site/config/config.php", 'MIO');
+    file_put_contents("$site/public/uploads/foto.webp", 'FOTO');
+    $mk = function (array $files, string $path) {
+        $z = new ZipArchive();
+        $z->open($path, ZipArchive::CREATE | ZipArchive::OVERWRITE);
+        foreach ($files as $n => $c) {
+            $z->addFromString($n, $c);
+        }
+        $z->close();
+    };
+    $v1 = $tmp . '/v1.zip';
+    $mk(['Repo-main/app/bootstrap.php' => 'v1', 'Repo-main/app/old.php' => 'v1', 'Repo-main/public/index.php' => 'i1', 'Repo-main/config/config.php' => 'ATTACCO', 'Repo-main/storage/x' => 'x', 'Repo-main/public/uploads/foto.webp' => 'ATTACCO'], $v1);
+    Alien\Services\Updater::applyZip($v1, $site, 'aaa');
+    eq([file_get_contents("$site/app/bootstrap.php"), file_get_contents("$site/config/config.php"), file_get_contents("$site/public/uploads/foto.webp")], ['v1', 'MIO', 'FOTO']);
+    $v2 = $tmp . '/v2.zip';
+    $mk(['Repo-main/app/bootstrap.php' => 'v2', 'Repo-main/public/index.php' => 'i2', 'Repo-main/views/new.php' => 'n'], $v2);
+    Alien\Services\Updater::applyZip($v2, $site, 'bbb');
+    eq(file_get_contents("$site/app/bootstrap.php"), 'v2');
+    eq(is_file("$site/app/old.php"), false, 'file rimosso upstream');
+    eq(is_file("$site/views/new.php"), true);
+    eq(Alien\Services\Updater::state($site)['sha'], 'bbb');
+    eq(glob("$site/storage/backups/code-*.zip") !== [], true, 'backup del codice');
+    $bad = $tmp . '/bad.zip';
+    $mk(['Repo-main/app/bootstrap.php' => 'x', 'Repo-main/public/index.php' => 'x', 'Repo-main/../../evil.php' => 'x'], $bad);
+    $threw = false;
+    try {
+        Alien\Services\Updater::applyZip($bad, $site, 'ccc');
+    } catch (RuntimeException) {
+        $threw = true;
+    }
+    eq($threw, true, 'zip-slip rifiutato');
+    eq(file_get_contents("$site/app/bootstrap.php"), 'v2');
+    $junk = $tmp . '/junk.zip';
+    $mk(['Repo-main/readme.txt' => 'x'], $junk);
+    $threw = false;
+    try {
+        Alien\Services\Updater::applyZip($junk, $site, 'ddd');
+    } catch (RuntimeException) {
+        $threw = true;
+    }
+    eq($threw, true, 'pacchetto non AlienShop rifiutato');
+});
+t('aggiornamento: controllo versione da GitHub, webhook firmato', function () {
+    $sha = str_repeat('a', 40);
+    Http::$fake = function ($method, $url) use ($sha) {
+        if (str_contains($url, '/commits/')) {
+            return ['status' => 200, 'body' => '', 'error' => '', 'json' => ['sha' => $sha, 'commit' => ['message' => "Nuova funzione\n\ndettagli", 'committer' => ['date' => '2026-01-01T00:00:00Z']]]];
+        }
+        return ['status' => 404, 'body' => '', 'error' => '', 'json' => null];
+    };
+    Settings::set('update_latest', '');
+    $l = Alien\Services\Updater::latest(true);
+    eq([$l['sha'], $l['message']], [$sha, 'Nuova funzione']);
+    Http::$fake = fn() => ['status' => 403, 'body' => '', 'error' => '', 'json' => null];
+    $l = Alien\Services\Updater::latest(true);
+    eq($l['sha'], $sha, 'in caso di errore resta il valore in cache');
+    eq(isset($l['error']), true);
+    Http::$fake = null;
+    Settings::set('update_latest', '');
+    $body = '{"ref":"refs/heads/main"}';
+    $sig = 'sha256=' . hash_hmac('sha256', $body, 'segreto');
+    eq(Alien\Services\Updater::verifySignature($body, $sig, 'segreto'), true);
+    eq(Alien\Services\Updater::verifySignature($body . ' ', $sig, 'segreto'), false);
+    eq(Alien\Services\Updater::verifySignature($body, $sig, ''), false);
+});
 out("Fatturazione elettronica\n");
 use Alien\EInvoice\Fiscal;
 use Alien\EInvoice\InvoiceData;
@@ -886,6 +988,5 @@ t('Pulizia file di test della fatturazione', function () {
 });
 
 out("\n$passed ok, $failed falliti\n");
-array_map('unlink', glob($tmp . '/*') ?: []);
-@rmdir($tmp);
+@shell_exec('rm -rf ' . escapeshellarg($tmp));
 exit($failed ? 1 : 0);

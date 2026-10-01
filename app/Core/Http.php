@@ -40,8 +40,11 @@ final class Http
         return ['status' => $status, 'body' => (string)$raw, 'json' => json_decode((string)$raw, true), 'error' => ''];
     }
 
-    public static function download(string $url, int $maxBytes = 15_000_000): ?string
+    public static function download(string $url, int $maxBytes = 15_000_000, array $headers = []): ?string
     {
+        if (self::$fake && is_string($r = (self::$fake)('DOWNLOAD', $url, null, $headers))) {
+            return $r;
+        }
         for ($hop = 0; $hop <= 3; $hop++) {
             $ip = self::publicIp($url);
             if ($ip === null) {
@@ -58,6 +61,7 @@ final class Http
                 CURLOPT_CONNECTTIMEOUT => 8,
                 CURLOPT_FOLLOWLOCATION => false,
                 CURLOPT_PROTOCOLS => CURLPROTO_HTTP | CURLPROTO_HTTPS,
+                CURLOPT_HTTPHEADER => $hop === 0 ? $headers : [],
                 CURLOPT_RESOLVE => [$p['host'] . ':' . $port . ':' . $ip],
                 CURLOPT_USERAGENT => 'AlienShop/' . ALIEN_VERSION,
                 CURLOPT_HEADERFUNCTION => static function ($ch, $line) use (&$location) {

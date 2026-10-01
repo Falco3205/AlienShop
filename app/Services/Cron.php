@@ -47,6 +47,7 @@ final class Cron
             'einvoice' => EInvoices::cron(),
             'review_requests' => Modules::on('reviews') ? Reviews::sendRequests() : 0,
         ];
+        $report['update'] = Updater::cron();
         Settings::set('cron_last', now());
         return $report;
     }

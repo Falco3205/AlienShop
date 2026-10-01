@@ -99,6 +99,11 @@ final class Routes
         $add('POST', '/admin/emails/{id}/reset', EmailsController::class, 'reset');
         $add('POST', '/admin/emails/{id}/preview', EmailsController::class, 'preview');
         $add('POST', '/admin/emails/{id}/test', EmailsController::class, 'test');
+        $add('GET', '/admin/updates', UpdatesController::class, 'index');
+        $add('POST', '/admin/updates/check', UpdatesController::class, 'check');
+        $add('POST', '/admin/updates/apply', UpdatesController::class, 'apply');
+        $add('POST', '/admin/updates/rollback', UpdatesController::class, 'rollback');
+        $add('POST', '/admin/updates/settings', UpdatesController::class, 'settings');
         $add('GET', '/admin/backup', BackupController::class, 'index');
         $add('POST', '/admin/backup/download', BackupController::class, 'download');
         $add('GET', '/admin/modules', ModulesController::class, 'index');

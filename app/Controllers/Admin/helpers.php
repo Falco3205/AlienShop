@@ -50,6 +50,7 @@ function admin_counts(): array
         $c = [
             'to_ship' => (int)\Alien\Core\DB::val("SELECT COUNT(*) FROM orders WHERE status = 'processing'"),
             'pending' => (int)\Alien\Core\DB::val("SELECT COUNT(*) FROM orders WHERE status = 'pending' AND payment_status <> 'failed'"),
+            'update' => \Alien\Services\Updater::availableCached() ? 1 : 0,
         ];
     }
     return $c;

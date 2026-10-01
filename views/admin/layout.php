@@ -25,6 +25,7 @@ $groups = [
         'payments' => ['admin/payments', __('Pagamenti'), 'M2 7h20v12H2zM2 11h20'],
         'shipping' => ['admin/shipping', __('Spedizioni'), 'M1 3h15v13H1zM16 8h4l3 3v5h-7zM6 19.5a1.5 1.5 0 100-3 1.5 1.5 0 000 3zM18 19.5a1.5 1.5 0 100-3 1.5 1.5 0 000 3z'],
         'emails' => ['admin/emails', __('Email ai clienti'), 'M3 5h18v14H3zM3 7l9 6 9-6'],
+        'updates' => ['admin/updates', __('Aggiornamenti'), 'M12 19V5M5 12l7-7 7 7', $counts['update']],
         'modules' => ['admin/modules', __('Estensioni'), 'M12 2l3 7h7l-5.5 4.5L18 21l-6-4-6 4 1.5-7.5L2 9h7z'],
         'backup' => ['admin/backup', __('Backup'), 'M4 7c0-1.7 3.6-3 8-3s8 1.3 8 3-3.6 3-8 3-8-1.3-8-3zM4 7v10c0 1.7 3.6 3 8 3s8-1.3 8-3V7'],
         'import' => ['admin/import', __('Import / Export'), 'M12 3v12M7 10l5 5 5-5M5 21h14'],

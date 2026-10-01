@@ -134,6 +134,29 @@ switch ($command) {
         echo json_encode(Alien\Services\Cron::run()) . "\n";
         exit(0);
 
+    case 'update':
+        $st = Alien\Services\Updater::status(true);
+        if ($st['error']) {
+            fwrite(STDERR, $st['error'] . "\n");
+            exit(1);
+        }
+        if (!$st['available']) {
+            echo "Già aggiornato (" . substr($st['current'], 0, 7) . ").\n";
+            exit(0);
+        }
+        echo "Aggiornamento disponibile: " . substr($st['current'], 0, 7) . " -> " . substr($st['latest']['sha'], 0, 7) . " " . ($st['latest']['message'] ?? '') . "\n";
+        if (in_array('--check', $flags, true)) {
+            exit(0);
+        }
+        $r = Alien\Services\Updater::apply();
+        echo $r['message'] . "\n";
+        exit($r['ok'] ? 0 : 1);
+
+    case 'update:rollback':
+        $r = Alien\Services\Updater::rollback();
+        echo $r['message'] . "\n";
+        exit($r['ok'] ? 0 : 1);
+
     case 'migrate':
         Alien\Services\Migrator::run();
         echo "Database aggiornato.\n";
@@ -154,6 +177,7 @@ switch ($command) {
             . "  orders:expire [ore=48]   annulla ordini Stripe/PayPal non pagati (da usare in cron)\n"
             . "  user:password <email> <password>   reimposta la password di un utente\n"
             . "  backup:create [file] | backup:restore <file>\n  cron:run   esegue le attività pianificate (email, promemoria, scadenze)\n  migrate    aggiorna il database\n"
+            . "  update [--check]   aggiorna da GitHub (o solo controlla)\n  update:rollback   torna alla versione precedente\n"
             . "  cache:clear\n";
         exit($command === '' ? 0 : 1);
 }
