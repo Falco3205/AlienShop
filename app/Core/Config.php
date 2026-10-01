@@ -40,6 +40,9 @@ final class Config
     public static function write(array $data): void
     {
         $php = "<?php\nreturn " . var_export($data, true) . ";\n";
+        if (!is_dir(dirname(self::file()))) {
+            @mkdir(dirname(self::file()), 0750, true);
+        }
         file_put_contents(self::file(), $php, LOCK_EX);
         @chmod(self::file(), 0640);
         self::$data = $data;
