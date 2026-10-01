@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 const AGENT_VERSION = '2.0.0';
 
-final class Node
+class Node
 {
     public array $log = [];
     public bool $dry = false;
@@ -90,6 +90,26 @@ final class Node
         foreach ($r['json']['jobs'] ?? [] as $job) {
             $this->execute((int)$job['id'], (string)$job['type'], (array)$job['payload']);
         }
+        return 0;
+    }
+
+    public function claim(string $user, string $domain): int
+    {
+        try {
+            if (($this->cfg['role'] ?? '') !== 'edge') {
+                throw new RuntimeException('Il collegamento con Hestia è solo per il frontend.');
+            }
+            $this->validate(['hestia_user' => $user, 'domain' => $domain], ['hestia_user' => 'user', 'domain' => 'domain']);
+        } catch (RuntimeException $e) {
+            fwrite(STDERR, $e->getMessage() . "\n");
+            return 1;
+        }
+        $r = $this->http('POST', '/api/node/claim', ['user' => $user, 'domain' => $domain]);
+        if ($r['status'] !== 200) {
+            fwrite(STDERR, 'Hub: ' . ($r['json']['error'] ?? 'HTTP ' . $r['status']) . "\n");
+            return 1;
+        }
+        echo "Dominio $domain registrato nell'hub: backend e frontend verranno configurati a breve.\n";
         return 0;
     }
 
@@ -511,6 +531,12 @@ if (PHP_SAPI === 'cli' && isset($argv[0]) && realpath($argv[0]) === realpath(__F
     switch ($cmd) {
         case 'run':
             exit($node->run());
+        case 'claim':
+            if (!isset($argv[2], $argv[3])) {
+                fwrite(STDERR, "Uso: alienshop-node claim UTENTE_HESTIA DOMINIO\n");
+                exit(1);
+            }
+            exit($node->claim($argv[2], $argv[3]));
         case 'info':
             echo json_encode($node->info(), JSON_PRETTY_PRINT) . "\n";
             exit(0);
@@ -518,7 +544,7 @@ if (PHP_SAPI === 'cli' && isset($argv[0]) && realpath($argv[0]) === realpath(__F
             echo AGENT_VERSION . "\n";
             exit(0);
         default:
-            fwrite(STDERR, "Comandi: run | info | version\n");
+            fwrite(STDERR, "Comandi: run | claim UTENTE DOMINIO | info | version\n");
             exit(1);
     }
 }

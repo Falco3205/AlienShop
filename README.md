@@ -2,8 +2,8 @@
 
 E-commerce leggero e veloce in PHP, senza dipendenze, con un **pannello (Hub)** per installare e controllare i negozi dei tuoi clienti su due VPS:
 
-- **Backend** — server Debian/Ubuntu "nudo" (Nginx, PHP-FPM, MariaDB), **senza Hestia e senza porte pubbliche**: ospita i negozi e l'hub.
-- **Frontend** — l'unica VPS con **Hestia**: pubblica i domini dei clienti (HTTPS, cache) e inoltra al backend.
+- **Backend** — server Debian/Ubuntu "nudo" (Nginx, PHP-FPM, MariaDB), **senza Hestia e senza porte pubbliche**: ospita i negozi.
+- **Frontend** — l'unica VPS con **Hestia**: pubblica i domini dei clienti (HTTPS, cache), inoltra al backend e ospita l'**hub** in una cartella di un tuo dominio (`https://falconefabio.it/alienshop/`, nessun sottodominio).
 
 Le due VPS parlano dentro **Tailscale**; domini e DNS sono su **Cloudflare**.
 
@@ -17,17 +17,18 @@ Le due VPS parlano dentro **Tailscale**; domini e DNS sono su **Cloudflare**.
 ```
  visitatore ──HTTPS──▶ Cloudflare (DNS, WAF) ──▶ VPS FRONTEND (Hestia) ──── Tailscale ────▶ VPS BACKEND (senza Hestia)
                                                  Nginx: HTTPS, cache 60 s,                  Nginx + PHP-FPM + MariaDB
-                                                 serve la cache se il backend è giù         un utente, un database e un pool PHP
-                                                                                            separati per ogni negozio + l'hub
- tu (portatile con Tailscale) ───────────────▶ http://hub.falconefabio.it  (raggiungibile solo dalla tailnet)
+                                                 HUB su falconefabio.it/alienshop           un utente, un database e un pool PHP
+                                                                                            separati per ogni negozio
+ tu ──HTTPS + 2FA obbligatoria──▶ https://falconefabio.it/alienshop/   (l'hub vede e gestisce tutti i domini)
 ```
 
-- **Hub**: crea i negozi e mostra incassi, ordini, errori, versioni. Non ha password né accessi SSH ai server: sono gli **agenti** sulle VPS a contattarlo ogni minuto ed eseguire i lavori.
+- **Hub**: sta sul frontend in `/alienshop/`. Mostra tutti i domini con AlienShop, incassi, ordini, errori, versioni, e crea/aggiorna/sospende i negozi. Non ha accessi SSH ai server: sono gli **agenti** (uno per VPS) a contattarlo ogni minuto ed eseguire i lavori; per le statistiche interroga i negozi dentro Tailscale.
 - **Backend**: per ogni negozio crea utente di sistema, database, pool PHP isolato e configurazione Nginx. Nessun certificato qui: HTTPS lo termina il frontend.
-- **Frontend**: Hestia gestisce domini e certificati; un template proxy inoltra al backend.
-- Ogni negozio va nella **cartella principale** del dominio o in una **sottocartella**.
+- **Frontend**: Hestia gestisce domini e certificati; il template `alienshop-edge` inoltra al backend.
+- **Installazione automatica da Hestia**: quando crei un dominio in Hestia scegliendo il template web `alienshop-edge`, un gancio avvisa l'hub, che installa il negozio sul **backend** e poi lo pubblica sul **frontend**, senza altri passaggi.
+- Ogni negozio va nella **cartella principale** del dominio o in una **sottocartella** (le sottocartelle si scelgono dall'hub).
 
-Nomi usati nei comandi (cambiali con i tuoi): hub `hub.falconefabio.it`, utente Hestia del frontend `falco3205`. Valori da annotare: **IP_FRONTEND** (pubblico) e **TS_BACKEND** (IP Tailscale del backend, `tailscale ip -4`).
+Nomi usati nei comandi (cambiali con i tuoi): dominio dell'hub `falconefabio.it` (cartella `alienshop`), utente Hestia del frontend `falco3205`. Valori da annotare: **IP_FRONTEND** e **IP_BACKEND** (pubblici) e **TS_BACKEND** (IP Tailscale del backend, `tailscale ip -4`).
 
 ## La tua infrastruttura oggi e come ci si inserisce
 
@@ -106,20 +107,25 @@ Tieni una seconda sessione SSH aperta mentre abiliti UFW, poi verifica da fuori 
 
 1. **SSL/TLS → Overview → Full (strict)**; *Always Use HTTPS* attivo; *Minimum TLS Version* 1.2.
 2. **Limite di richieste al login** (*Security → WAF → Rate limiting rules*): URI che contiene `/login`, metodo POST, più di 10 richieste in 10 secondi per IP → *Block*.
-3. DNS dell'hub: record `A` **`hub`** → **TS_BACKEND**, **DNS only** (nuvola grigia). Un indirizzo 100.x è raggiungibile solo dalla tailnet: l'hub non esiste per il resto di Internet.
+3. **IP Access Rules** (*Security → WAF → Tools*): se limiti l'hub con `--allow`, ricordati che l'IP che l'hub vede è quello reale del visitatore (Cloudflare lo passa nell'intestazione `CF-Connecting-IP`).
+4. Il dominio dell'hub (`falconefabio.it`) è già a posto: nessun record DNS da aggiungere.
 
-## 4 · Backend: installa l'hub
+## 4 · Frontend: installa l'hub in /alienshop/
 
-Come root sul **backend** (lo script installa Nginx, PHP-FPM e MariaDB, ascoltando solo sull'IP Tailscale):
+Come root sul **frontend**, dopo aver aggiunto in Hestia il dominio `falconefabio.it` (utente `falco3205`) e averlo fatto puntare a Cloudflare:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Falco3205/AlienShop/main/hub/install.sh -o /root/install-hub.sh
-bash /root/install-hub.sh --domain hub.falconefabio.it --admin-email tu@tuamail.it
+bash /root/install-hub.sh --user falco3205 --domain falconefabio.it --admin-email tu@tuamail.it \
+  --allow IP_CASA,IP_BACKEND
 ```
 
-Stampa la password dell'amministratore. Dal portatile (con Tailscale acceso) apri `http://hub.falconefabio.it`, accedi e **subito**: *Sicurezza → Verifica in due passaggi → Attiva*; conserva i codici di recupero. Il traffico nella tailnet è cifrato da WireGuard, quindi qui non serve un certificato.
+Lo script copia l'hub in `/home/falco3205/web/falconefabio.it/public_html/alienshop`, aggiunge le regole Nginx di Hestia, un cron di raccolta dati e stampa la password dell'amministratore. Il resto del sito `falconefabio.it` non viene toccato.
 
-Aggiornare l'hub in futuro: `runuser -u alienhub -- php /opt/alienshop-hub/hub/bin/hub update`.
+- `--allow` limita il pannello a quegli IP (il tuo e quello **pubblico del backend**, da cui l'agente contatta l'hub): consigliato. Se lo ometti, proteggi `/alienshop/` con **Cloudflare Access**.
+- Apri `https://falconefabio.it/alienshop/` e accedi: la **verifica in due passaggi è obbligatoria** e ti viene chiesta subito (*Sicurezza → Attiva*); conserva i codici di recupero.
+
+Aggiornare l'hub in futuro: `runuser -u falco3205 -- php /home/falco3205/web/falconefabio.it/public_html/alienshop/hub/bin/hub update`.
 
 ## 5 · Collega il backend all'hub
 
@@ -129,29 +135,45 @@ Hub → **Server → Collega un server**:
 |---|---|
 | Nome | `VPS backend` |
 | Ruolo | Backend |
-| IP pubblico | IP pubblico del backend (facoltativo) |
+| IP pubblico | IP_BACKEND |
 | Indirizzo del backend visto dal frontend | `http://TS_BACKEND:80` |
 | Utente Hestia | vuoto (il backend non usa Hestia) |
 
-Copia il comando mostrato (contiene il token, visibile una sola volta) ed eseguilo **come root sul backend**: installa l'agente e prepara il server (la parte di Nginx/PHP/MariaDB è già a posto dal passo 4). Verifica:
+Prima, **come root sul backend**, prepara lo stack (Nginx, PHP-FPM, MariaDB, in ascolto solo sull'IP Tailscale):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Falco3205/AlienShop/main/node/stack.sh -o /root/stack.sh && bash /root/stack.sh
+```
+
+Poi copia il comando mostrato dal pannello (contiene il token, visibile una sola volta) ed eseguilo come root sul backend. Verifica:
 
 ```bash
 tail -n 5 /var/log/alienshop-node.log      # nessun errore
 systemctl status nginx php*-fpm mariadb --no-pager | grep Active
 ```
 
-Nel pannello il server deve risultare **online** entro un minuto.
+Il server deve risultare **online** entro un minuto. L'agente raggiunge l'hub su `https://falconefabio.it/alienshop`.
 
 ## 6 · Collega il frontend
 
-Hub → **Server → Collega un server** → Ruolo **Frontend**, IP pubblico **IP_FRONTEND**, **Utente Hestia** `falco3205`. Esegui il comando mostrato **come root sul frontend**: installa l'agente, il template Hestia `alienshop-edge` (proxy con cache) e legge l'IP vero dei visitatori da Cloudflare. L'agente raggiunge l'hub dalla tailnet (`hub.falconefabio.it` → TS_BACKEND).
+Hub → **Server → Collega un server** → Ruolo **Frontend**, IP pubblico **IP_FRONTEND**, **Utente Hestia** `falco3205`. Esegui il comando mostrato **come root sul frontend**: installa l'agente, il template Hestia `alienshop-edge` (proxy con cache e gancio di installazione automatica) e legge l'IP vero dei visitatori da Cloudflare.
+
+Poi, in **Impostazioni** dell'hub, scegli il **Server backend per i domini creati da Hestia** (basta se ne hai uno solo).
 
 ## 7 · Crea un negozio per un cliente
 
-1. **DNS del dominio del cliente** (su Cloudflare): `A` `@` → **IP_FRONTEND**, *Proxied* (nuvola arancione); `www` `CNAME` → `@`, *Proxied*. Fallo **prima**: serve per emettere il certificato sul frontend.
-2. Hub → **Negozi → Nuovo negozio**: dominio, nome, email dell'amministratore, tema, lingua; **dove installarlo** (cartella principale o sottocartella); **Server backend** `VPS backend`; **Pubblicazione** *Tramite frontend* → `VPS frontend`.
-3. Entro un minuto il backend crea utente, database, pool PHP e sito, e installa il negozio; poi il frontend lo pubblica. La scheda mostra esito, registro e **password iniziale**: salvala e premi *Le ho salvate*.
-4. **Apri l'admin del negozio** dalla scheda (accesso monouso) e attiva la 2FA (*Admin → Profilo → Sicurezza*).
+**A · Automatico, da Hestia (consigliato)**
+
+1. **DNS** su Cloudflare: `A` `@` → **IP_FRONTEND**, *Proxied*; `www` `CNAME` → `@`, *Proxied*. Fallo **prima**: serve per il certificato.
+2. In Hestia: *Web → Aggiungi dominio*, utente `falco3205`, e nelle opzioni avanzate **Web Template (PHP-FPM)** → `alienshop-edge`; abilita SSL con Let's Encrypt.
+3. Entro un minuto il gancio avvisa l'hub: il **backend** crea utente, database, pool PHP e sito e installa il negozio, poi il **frontend** lo pubblica. Il negozio compare nell'hub con esito, registro e **password iniziale**: salvala e premi *Le ho salvate*.
+4. **Apri l'admin del negozio** dalla scheda (accesso monouso) e attiva la 2FA.
+
+L'elenco "Quick Install App" di Hestia (quello con WordPress) **non è stato implementato**: richiede di modificare i file di Hestia, che un aggiornamento sovrascrive. Il template web fa la stessa cosa in modo stabile.
+
+**B · Manuale, dall'hub (anche per sottocartelle)**
+
+Hub → **Negozi → Nuovo negozio**: dominio, nome, email dell'amministratore, tema, lingua; **dove installarlo** (cartella principale o sottocartella); **Server backend**; **Pubblicazione** *Tramite frontend*. Il resto è come sopra.
 
 Sottocartella: il negozio risponde su `dominio.it/cartella`; il resto del dominio mostra una pagina segnaposto che puoi sostituire con i file del sito del cliente in `/var/www/alienshop/sites/dominio.it/` sul backend.
 
@@ -166,7 +188,7 @@ v-add-web-domain-ssl falco3205 dominio.it /root/ssl/dominio.it
 **Regole fisse**
 - 2FA su GitHub, Cloudflare, Tailscale, Hestia, **hub** e **ogni admin di negozio**.
 - Backend senza porte pubbliche; frontend aperto solo a Cloudflare; SSH e pannello Hestia (8083) **solo via Tailscale**.
-- Hub solo in tailnet, su un dominio dedicato.
+- Hub in `/alienshop/` con 2FA obbligatoria e `--allow` (o Cloudflare Access); il suo dominio non ospita altro di non fidato.
 - Branch `main` protetto su GitHub; **aggiornamento automatico dei negozi spento** finché non sei sicuro di ciò che pubblichi.
 - Password lunghe e diverse (gestore di password); quelle iniziali dei negozi si cambiano al primo accesso.
 - Il token dei server non si condivide: se esce, *Server → Genera un nuovo token* e rilancia il comando.
@@ -180,7 +202,7 @@ v-add-web-domain-ssl falco3205 dominio.it /root/ssl/dominio.it
 
    ```bash
    mysqldump --all-databases --single-transaction | gzip > /root/backup-$(date +%F).sql.gz
-   tar czf /root/negozi-$(date +%F).tgz /var/www/alienshop /opt/alienshop-hub/hub/config /opt/alienshop-hub/hub/storage
+   tar czf /root/negozi-$(date +%F).tgz /var/www/alienshop /home/falco3205/web/falconefabio.it/public_html/alienshop/hub/config /home/falco3205/web/falconefabio.it/public_html/alienshop/hub/storage
    ```
 5. Se sospetti una violazione: sospendi il negozio dall'hub, rigenera il token del server, cambia le password, controlla *Attività* e `/var/log/alienshop-node.log`, e leggi [SECURITY.md](SECURITY.md).
 
@@ -188,7 +210,8 @@ v-add-web-domain-ssl falco3205 dominio.it /root/ssl/dominio.it
 
 | Sintomo | Dove guardare |
 |---|---|
-| Server "offline" nell'hub | `tail -f /var/log/alienshop-node.log`; `cat /etc/alienshop/node.json`; `tailscale status`; `curl -I http://hub.falconefabio.it` dalla VPS |
+| Server "offline" nell'hub | `tail -f /var/log/alienshop-node.log`; `cat /etc/alienshop/node.json`; `tailscale status`; `curl -I https://falconefabio.it/alienshop/` dalla VPS |
+| Il dominio creato in Hestia non compare nell'hub | `cat /var/log/alienshop-claim.log` sul frontend; template `alienshop-edge` scelto? utente Hestia incluso nell'agente? backend predefinito impostato? |
 | Negozio in errore | Hub → **Attività** → apri il lavoro: c'è il registro dei comandi |
 | 502 sul dominio del cliente | dal frontend: `curl -I -H 'Host: dominio.it' http://TS_BACKEND:80/`; `tailscale ping TS_BACKEND`; ACL di Tailscale; sul backend `nginx -t` e `tail /var/log/nginx/error.log` |
 | 526 / errore certificato | certificato di origine sul frontend (passo 7) |
@@ -197,7 +220,7 @@ v-add-web-domain-ssl falco3205 dominio.it /root/ssl/dominio.it
 
 ## Limiti noti (leggi prima di usarlo con clienti veri)
 
-La parte **nativa del backend** (utente, database, pool PHP-FPM, Nginx, installazione, sottocartelle, sospensione, isolamento) e l'hub sono stati provati per davvero in un container Debian con Nginx, PHP-FPM e MariaDB veri: installazione dell'hub, lavoro creato dall'hub, eseguito dall'agente, negozio attivo e interrogato. **Non provati** su server reali: il template Hestia del frontend, Tailscale, UFW, Cloudflare, i pagamenti, la posta e il Sistema di Interscambio. Alla prima installazione fai una prova con un dominio tuo e tieni d'occhio la pagina *Attività* dell'hub. I negozi sul backend non possono eseguire comandi di sistema dal web (per sicurezza): si aggiornano dal pannello con il metodo ZIP.
+La parte **nativa del backend** (utente, database, pool PHP-FPM, Nginx, installazione, sottocartelle, sospensione, isolamento) e l'hub sono stati provati per davvero in un container Debian con Nginx, PHP-FPM e MariaDB veri: installazione dell'hub, lavoro creato dall'hub, eseguito dall'agente, negozio attivo e interrogato. **Non provati** su server reali: il template e il gancio Hestia del frontend, l'installazione dell'hub sotto Hestia, Tailscale, UFW, Cloudflare, i pagamenti, la posta e il Sistema di Interscambio. Alla prima installazione fai una prova con un dominio tuo e tieni d'occhio la pagina *Attività* dell'hub. I negozi sul backend non possono eseguire comandi di sistema dal web (per sicurezza): si aggiornano dal pannello con il metodo ZIP.
 
 ## Test
 

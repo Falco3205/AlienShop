@@ -23,7 +23,7 @@ final class SettingsController extends Controller
             } elseif (!filter_var($req->str('default_admin_email'), FILTER_VALIDATE_EMAIL)) {
                 $error = 'Email predefinita non valida.';
             } else {
-                Settings::setMany(['shop_repo' => $repo, 'shop_branch' => $branch, 'default_theme' => $req->str('default_theme') ?: 'aurora', 'default_lang' => $req->str('default_lang') === 'en' ? 'en' : 'it', 'default_admin_email' => $req->str('default_admin_email')]);
+                Settings::setMany(['default_backend' => (string)$req->int('default_backend'), 'shop_repo' => $repo, 'shop_branch' => $branch, 'default_theme' => $req->str('default_theme') ?: 'aurora', 'default_lang' => $req->str('default_lang') === 'en' ? 'en' : 'it', 'default_admin_email' => $req->str('default_admin_email')]);
                 $new = (string)($req->post['new_password'] ?? '');
                 if ($new !== '') {
                     if (strlen($new) < 10) {
@@ -42,6 +42,7 @@ final class SettingsController extends Controller
             'subtitle' => 'Valori predefiniti per i nuovi negozi e aggiornamento dell\'hub',
             'error' => $error,
             'git' => is_dir(REPO . '/.git'),
+            'backends' => array_column(\Hub\Nodes::byRole('backend'), 'name', 'id'),
         ], 'settings');
     }
 

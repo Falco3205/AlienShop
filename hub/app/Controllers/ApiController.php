@@ -63,4 +63,15 @@ final class ApiController
         Jobs::complete((int)$job['id'], !empty($b['ok']), (array)($b['result'] ?? []) + (!empty($b['ok']) ? [] : ['error' => (string)($b['error'] ?? 'errore')]), (string)($b['log'] ?? ''));
         return $this->json(['ok' => true]);
     }
+
+    public function claim(Request $req): Response
+    {
+        $node = $this->node($req);
+        if (!$node || $node['role'] !== 'edge') {
+            return $this->json(['error' => 'unauthorized'], 401);
+        }
+        $b = $this->body($req);
+        [$id, $error] = Shops::claimEdge($node, (string)($b['user'] ?? ''), (string)($b['domain'] ?? ''));
+        return $error ? $this->json(['error' => $error], 422) : $this->json(['ok' => true, 'shop_id' => $id]);
+    }
 }

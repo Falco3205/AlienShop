@@ -67,6 +67,10 @@ final class App
                     if (!Auth::isAdmin()) {
                         return Response::redirect('login');
                     }
+                    if (!\Alien\Core\TwoFactor::enabled((int)(Auth::user()['id'] ?? 0)) && !preg_match('#^/(security|logout|assets/)#', $req->path)) {
+                        flash('error', 'Per proteggere i tuoi server devi prima attivare la verifica in due passaggi.');
+                        return Response::redirect('security', 303);
+                    }
                     if ($req->isPost() && (!$req->sameOrigin() || !Csrf::valid($req))) {
                         flash('error', 'Sessione scaduta, riprova.');
                         return Response::redirect($req->backTo(''));
@@ -115,5 +119,6 @@ final class App
 
         $add('POST', '/api/node/poll', ApiController::class, 'poll', true);
         $add('POST', '/api/node/jobs/{id}', ApiController::class, 'result', true);
+        $add('POST', '/api/node/claim', ApiController::class, 'claim', true);
     }
 }

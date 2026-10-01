@@ -151,6 +151,36 @@ t('backend su Tailscale: proxy fidati locali e l\'hub interroga il negozio dalla
     [$url2, $h2, $p2] = Hub\ShopClient::target(['node_id' => 1, 'domain' => 'x.it', 'path' => ''], '/hub/stats');
     eq([$p2, $h2], [false, []], 'senza tailnet si usa l\'indirizzo pubblico');
 });
+t('dominio creato da Hestia: negozio sul backend predefinito, pubblicato dal frontend con l\'utente Hestia del dominio', function () use ($backId, $edgeId) {
+    $edge = Nodes::find($edgeId);
+    $backs = Nodes::byRole('backend');
+    [$id, $err] = Shops::claimEdge($edge, 'falco3205', 'auto-uno.it');
+    eq([$id, str_contains((string)$err, 'backend predefinito')], [null, true], 'più backend senza predefinito');
+    Settings::set('default_backend', (string)$backId);
+    [$id, $err] = Shops::claimEdge($edge, 'cliente_x', 'auto-uno.it');
+    eq($err, null);
+    $shop = Shops::find($id);
+    eq([$shop['domain'], $shop['path'], (int)$shop['node_id'], (int)$shop['edge_node_id'], $shop['hestia_user'], $shop['admin_email']], ['auto-uno.it', '', $backId, $edgeId, 'cliente_x', 'me@test.it']);
+    $j = Jobs::claimFor($backId);
+    $install = null;
+    foreach ($j as $x) {
+        if ($x['payload']['domain'] === 'auto-uno.it') {
+            $install = $x;
+        }
+    }
+    eq($install['type'], 'install_shop');
+    eq($install['payload']['mode'], 'edge');
+    Jobs::complete($install['id'], true, [], 'ok');
+    $e = Jobs::claimFor($edgeId);
+    $payload = end($e)['payload'];
+    eq([$payload['domain'], $payload['hestia_user']], ['auto-uno.it', 'cliente_x'], 'il frontend usa l\'utente Hestia del dominio');
+    [$dup, $err2] = Shops::claimEdge($edge, 'cliente_x', 'auto-uno.it');
+    eq([$dup, $err2 !== null], [null, true], 'duplicato rifiutato');
+    [$bad] = Shops::claimEdge($edge, 'Bad User', 'altro-dominio.it');
+    eq($bad, null);
+    [$bad] = Shops::claimEdge(Nodes::find($backId), 'cliente_x', 'altro-dominio.it');
+    eq($bad, null, 'un backend non può registrare domini');
+});
 t('installazione fallita: stato errore con messaggio e nuovo tentativo', function () use ($backId) {
     [$id] = Shops::create(['name' => 'Verdi', 'domain' => 'verdi.it', 'admin_email' => 'v@verdi.it', 'node_id' => $backId]);
     $j = Jobs::claimFor($backId)[0];

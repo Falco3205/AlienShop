@@ -107,6 +107,39 @@ t('frontend (Hestia): proxy, cache, certificato; nessun tunnel', function () use
     }
     ok($threw);
 });
+t('claim da Hestia: solo frontend, utente ammesso, richiesta all\'hub', function () use ($edge, $backend) {
+    $calls = [];
+    $mk = function (array $cfg) use (&$calls) {
+        return new class($cfg, true, $calls) extends Node {
+            public function __construct(array $cfg, bool $dry, private array &$calls)
+            {
+                parent::__construct($cfg, $dry);
+            }
+            public function http(string $method, string $path, array $body = []): array
+            {
+                $this->calls[] = [$method, $path, $body];
+                return ['status' => 200, 'json' => ['ok' => true]];
+            }
+        };
+    };
+    $n = $mk(['hub' => 'x', 'token' => 'y', 'role' => 'edge', 'user' => 'falco3205', 'users' => ['falco3205']]);
+    ob_start();
+    $rc = $n->claim('falco3205', 'nuovo.it');
+    ob_end_clean();
+    ok($rc === 0 && $calls === [['POST', '/api/node/claim', ['user' => 'falco3205', 'domain' => 'nuovo.it']]], json_encode($calls));
+    $calls = [];
+    foreach ([['altro', 'nuovo.it'], ['falco3205', 'nuovo.it; id'], ['falco3205', "nuovo.it\n"]] as [$u, $d]) {
+        $x = $mk(['hub' => 'x', 'token' => 'y', 'role' => 'edge', 'users' => ['falco3205']]);
+        ob_start();
+        $err = fopen('php://memory', 'r');
+        $rc = @$x->claim($u, $d);
+        ob_end_clean();
+        ok($rc === 1, "$u $d");
+    }
+    ok($calls === [], 'nessuna richiesta all\'hub per input non validi');
+    $b = $mk(['hub' => 'x', 'token' => 'y', 'role' => 'backend']);
+    ok(@$b->claim('falco3205', 'nuovo.it') === 1 && $calls === [], 'sul backend non esiste');
+});
 t('validazione: iniezioni e parametri pericolosi rifiutati', function () use ($base, $backend) {
     $bad = [
         ['domain' => 'x.it; rm -rf /'], ['domain' => '../../etc'], ['path' => '../x'], ['path' => 'a b'], ['repo' => 'a/b; id'], ['branch' => 'main;id'], ['theme' => '../x'],

@@ -82,6 +82,7 @@ if [ "$ROLE" = "edge" ]; then
   TPL_DIR="$HESTIA/data/templates/web/nginx/php-fpm"
   install -m 644 /opt/alienshop/node/hestia/alienshop-edge.tpl "$TPL_DIR/alienshop-edge.tpl"
   install -m 644 /opt/alienshop/node/hestia/alienshop-edge.stpl "$TPL_DIR/alienshop-edge.stpl"
+  install -m 755 /opt/alienshop/node/hestia/alienshop-edge.sh "$TPL_DIR/alienshop-edge.sh"
   mkdir -p /var/cache/nginx/alienshop
   NGUSER="$(awk '/^user /{gsub(";","",$2); print $2; exit}' /etc/nginx/nginx.conf 2>/dev/null || true)"
   [ -n "$NGUSER" ] && chown -R "$NGUSER" /var/cache/nginx/alienshop || true

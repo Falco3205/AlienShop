@@ -130,6 +130,40 @@ final class Shops
         return [$id, []];
     }
 
+    public static function claimEdge(array $edge, string $user, string $domain): array
+    {
+        $domain = mb_strtolower(trim($domain));
+        if ($edge['role'] !== 'edge') {
+            return [null, 'Solo un server frontend può registrare un dominio.'];
+        }
+        if (!preg_match('/^[a-z][a-z0-9_-]{0,31}$/D', $user)) {
+            return [null, 'Utente Hestia non valido.'];
+        }
+        $backends = Nodes::byRole('backend');
+        $default = (int)Settings::get('default_backend', 0);
+        $backend = null;
+        foreach ($backends as $b) {
+            if ((int)$b['id'] === $default || (!$default && count($backends) === 1)) {
+                $backend = $b;
+            }
+        }
+        if (!$backend) {
+            return [null, 'Scegli il server backend predefinito nelle Impostazioni dell\'hub.'];
+        }
+        if (DB::val('SELECT COUNT(*) FROM shops WHERE domain = ? AND path = ?', [$domain, ''])) {
+            return [null, 'Esiste già un negozio su questo dominio.'];
+        }
+        [$id, $errors] = self::create([
+            'name' => $domain, 'domain' => $domain, 'path' => '', 'node_id' => $backend['id'], 'mode' => 'edge', 'edge_node_id' => $edge['id'],
+            'admin_email' => (string)Settings::get('default_admin_email', ''),
+        ]);
+        if (!$id) {
+            return [null, implode(' ', $errors)];
+        }
+        DB::update('shops', ['hestia_user' => $user, 'notes' => 'Creato da Hestia (utente ' . $user . ')'], 'id = ?', [$id]);
+        return [$id, null];
+    }
+
     public static function onJobDone(array $job, bool $ok, array $result, string $log): void
     {
         $shop = self::find((int)$job['shop_id']);
@@ -147,7 +181,7 @@ final class Shops
                 $node = Nodes::find((int)$shop['node_id']);
                 Jobs::queue((int)$shop['edge_node_id'], 'add_edge', [
                     'shop_id' => (int)$shop['id'], 'domain' => $shop['domain'], 'path' => $shop['path'],
-                    'hestia_user' => (Nodes::find((int)$shop['edge_node_id']) ?? [])['hestia_user'] ?? '',
+                    'hestia_user' => $shop['hestia_user'] ?: ((Nodes::find((int)$shop['edge_node_id']) ?? [])['hestia_user'] ?? ''),
                     'upstream' => $node['upstream'],
                 ], (int)$shop['id']);
                 return;
