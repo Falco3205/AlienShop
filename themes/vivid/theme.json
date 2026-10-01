@@ -1,0 +1,17 @@
+{
+  "name": "Vivid",
+  "description": "Colori vivaci e forme morbide per un brand giovane.",
+  "colors": [
+    "#ffffff",
+    "#fff4e6",
+    "#ff5a36",
+    "#7b2ff7"
+  ],
+  "layout": {
+    "header": "left",
+    "grid": 4,
+    "card": "shadow",
+    "hero": "split"
+  },
+  "version": "1.0.0"
+}

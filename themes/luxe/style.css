@@ -1,0 +1,8 @@
+:root{--bg:#0b0b0b;--surface:#141414;--text:#f1ece1;--muted:#a79e8a;--primary:#c9a24d;--primary-contrast:#111;--accent:#c9a24d;--border:#2a2519;--radius:0;--heading-font:Georgia,"Times New Roman",serif;--heading-weight:400;--heading-transform:uppercase;--heading-spacing:.12em;--btn-transform:uppercase;--card-img-ratio:4/5}
+input,select,textarea{background:#0b0b0b}.btn-outline{color:var(--text)}.alert{color:var(--text)}
+.site-header{background:#0b0b0b}.logo{letter-spacing:.3em}.nav a{text-transform:uppercase;letter-spacing:.18em;font-size:.72rem}
+.hero-full .hero{background-color:#141414;background-image:radial-gradient(circle at 75% 25%,#3a2e12 0,transparent 55%)}
+.hero-full .hero::before{background:linear-gradient(90deg,rgba(0,0,0,.85),rgba(0,0,0,.2))}
+.card-title{font-weight:400;letter-spacing:.06em;text-transform:uppercase;font-size:.85rem}.tag{color:#111;border-radius:0}
+.pay-option,.ship-option,.summary{background:var(--surface)}.alert-success{background:#16210f;color:#c5e2a3}.alert-error{background:#2b1010;color:#f4b5b5}
+.opts input:checked+label{color:#111}.pagination .current{color:#111}

@@ -1,0 +1,17 @@
+{
+  "name": "Luxe",
+  "description": "Nero e oro, ispirato alle boutique di alta gamma.",
+  "colors": [
+    "#0b0b0b",
+    "#141414",
+    "#c9a24d",
+    "#ffffff"
+  ],
+  "layout": {
+    "header": "center",
+    "grid": 3,
+    "card": "flat",
+    "hero": "full"
+  },
+  "version": "1.0.0"
+}

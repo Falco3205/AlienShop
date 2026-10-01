@@ -1,0 +1,9 @@
+<div class="card"><h2><?= e(__('Aggiungi redirect')) ?></h2>
+<p class="muted"><?= e(__('I redirect 301 per prodotti, categorie e pagine vengono creati automaticamente quando cambi uno slug o elimini un elemento. Usa questa sezione per migrare vecchi URL (es. da WooCommerce o Shopify).')) ?></p>
+<form method="post" style="display:grid;grid-template-columns:1fr 1fr 110px auto;gap:10px;align-items:end"><?= csrf_field() ?>
+<?= a_input('from', __('Da (percorso)'), '', 'text', ['placeholder' => '/vecchio-url']) ?><?= a_input('to', __('A (percorso o URL)'), '', 'text', ['placeholder' => '/products/nuovo']) ?>
+<?= a_select('code', __('Tipo'), [301 => '301', 302 => '302'], 301) ?><div class="field"><button class="btn" type="submit"><?= e(__('Aggiungi')) ?></button></div></form></div>
+<div class="card"><h2><?= e(__('Importa CSV')) ?></h2><form method="post" enctype="multipart/form-data" style="display:flex;gap:10px;align-items:center"><?= csrf_field() ?><input type="file" name="csv" accept=".csv,text/csv" required><button class="btn sec" type="submit"><?= e(__('Importa')) ?></button><span class="muted">from,to,code</span></form></div>
+<div class="card" style="padding:0"><table><thead><tr><th><?= e(__('Da')) ?></th><th><?= e(__('A')) ?></th><th><?= e(__('Tipo')) ?></th><th><?= e(__('Visite')) ?></th><th></th></tr></thead><tbody>
+<?php foreach ($rows as $r): ?><tr><td>/<?= e($r['from_path']) ?></td><td><?= preg_match('#^https?://#', $r['to_path']) ? e($r['to_path']) : '/' . e($r['to_path']) ?></td><td><?= (int)$r['code'] ?></td><td><?= (int)$r['hits'] ?></td><td class="right"><form method="post" action="<?= e(url('admin/redirects/' . $r['id'] . '/delete')) ?>"><?= csrf_field() ?><button class="btn danger sm" type="submit">✕</button></form></td></tr><?php endforeach ?>
+<?php if (!$rows): ?><tr><td colspan="5" class="muted"><?= e(__('Nessun redirect.')) ?></td></tr><?php endif ?></tbody></table></div>

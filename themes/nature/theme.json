@@ -1,0 +1,17 @@
+{
+  "name": "Nature",
+  "description": "Toni naturali e verdi per prodotti bio e artigianali.",
+  "colors": [
+    "#f7f5ee",
+    "#e6eadb",
+    "#3f6b3a",
+    "#c98a3c"
+  ],
+  "layout": {
+    "header": "center",
+    "grid": 3,
+    "card": "border",
+    "hero": "full"
+  },
+  "version": "1.0.0"
+}

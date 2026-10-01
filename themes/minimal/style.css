@@ -1,0 +1,4 @@
+:root{--bg:#fff;--surface:#f4f4f4;--text:#000;--muted:#767676;--primary:#000;--primary-contrast:#fff;--accent:#000;--border:#e8e8e8;--radius:0;--heading-weight:500;--heading-spacing:-.02em;--card-img-ratio:3/4}
+a:hover{color:var(--muted)}.logo{text-transform:uppercase;letter-spacing:.2em;font-size:1.1rem;font-weight:600}
+.tag{background:#000;border-radius:0}.card-title{font-weight:500;font-size:.92rem}.price{font-weight:400}
+.site-header{border-bottom-color:transparent}.nav a{font-size:.85rem}.btn{font-weight:500}

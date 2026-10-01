@@ -1,0 +1,7 @@
+:root{--bg:#fffdf2;--surface:#ffe14d;--text:#111;--muted:#444;--primary:#111;--primary-contrast:#ffe14d;--accent:#ff3b30;--border:#111;--radius:0;--heading-font:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;--heading-weight:800;--heading-transform:uppercase;--btn-transform:uppercase}
+.site-header{border-bottom:3px solid #111}.btn{border:3px solid #111;box-shadow:5px 5px 0 #111}.btn:hover{transform:translate(2px,2px);box-shadow:3px 3px 0 #111;opacity:1}
+.c-border .card{border:3px solid #111;box-shadow:6px 6px 0 #111}.card:hover{transform:translate(-2px,-2px)}
+.tag{border:2px solid #111;background:#ff3b30;border-radius:0}input,select,textarea{border:2px solid #111}
+.hero-split{background:var(--surface);border-bottom:3px solid #111}.hero-media img{border:3px solid #111;box-shadow:8px 8px 0 #111}
+.summary,.pay-option,.ship-option{border:2px solid #111}.site-footer{border-top:3px solid #111;background:#ffe14d}.opts label{border:2px solid #111}
+.announce{background:#ff3b30;color:#fff;font-family:ui-monospace,monospace;text-transform:uppercase}

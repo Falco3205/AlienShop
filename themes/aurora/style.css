@@ -1,0 +1,4 @@
+:root{--bg:#fff;--surface:#f5f6fa;--text:#14142b;--muted:#6e7191;--primary:#4f46e5;--primary-contrast:#fff;--accent:#f43f5e;--border:#e6e8f2;--radius:10px}
+.site-header{backdrop-filter:saturate(1.4) blur(8px);background:rgba(255,255,255,.88)}
+.hero-split{background:linear-gradient(135deg,#eef0ff,#fff1f4)}
+.btn{box-shadow:0 4px 14px rgba(79,70,229,.28)}

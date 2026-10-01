@@ -1,0 +1,4 @@
+:root{--bg:#fffafc;--surface:#fdeef4;--text:#3a2a3d;--muted:#85718a;--primary:#e07aa5;--primary-contrast:#fff;--accent:#8aa8f8;--border:#f4dbe6;--radius:22px;--heading-weight:700;--shadow:0 8px 26px rgba(224,122,165,.16)}
+.hero-minimal .hero{background:linear-gradient(135deg,#fde8f0,#e7edff)}
+.btn{border-radius:99px}.card-media{border-radius:20px}.tag{border-radius:99px}.cat-tile{border-radius:26px}
+.opts label{border-radius:99px}.qty{border-radius:99px}

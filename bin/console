@@ -1,0 +1,83 @@
+#!/usr/bin/env php
+<?php
+declare(strict_types=1);
+
+if (PHP_SAPI !== 'cli') {
+    exit(1);
+}
+define('ROOT', dirname(__DIR__));
+require ROOT . '/app/bootstrap.php';
+
+use Alien\Core\Cache;
+use Alien\Core\Config;
+use Alien\Core\DB;
+use Alien\Core\Lang;
+use Alien\Core\Settings;
+use Alien\Import\Exporter;
+use Alien\Import\ShopifyImporter;
+use Alien\Import\WooImporter;
+use Alien\Services\Orders;
+use Alien\Services\Themes;
+
+if (!Config::installed()) {
+    fwrite(STDERR, "AlienShop non è installato. Apri /install nel browser.\n");
+    exit(1);
+}
+DB::boot();
+Lang::load((string)Settings::get('locale', 'it'));
+@set_time_limit(0);
+
+[$script, $command] = array_pad($argv, 2, '');
+$args = array_slice($argv, 2);
+$flags = array_filter($args, static fn($a) => str_starts_with($a, '--'));
+$args = array_values(array_filter($args, static fn($a) => !str_starts_with($a, '--')));
+
+switch ($command) {
+    case 'import:woocommerce':
+    case 'import:shopify':
+        if (!isset($args[0]) || !is_file($args[0])) {
+            fwrite(STDERR, "Uso: console $command <file.csv> [--no-images] [--no-update]\n");
+            exit(1);
+        }
+        $importer = $command === 'import:shopify' ? new ShopifyImporter() : new WooImporter();
+        $result = $importer->import($args[0], !in_array('--no-images', $flags, true), !in_array('--no-update', $flags, true));
+        Cache::flush();
+        echo $result->summary() . "\n";
+        foreach ($result->errors as $e) {
+            echo " - $e\n";
+        }
+        exit($result->created + $result->updated > 0 ? 0 : 1);
+
+    case 'export:woocommerce':
+    case 'export:shopify':
+        $csv = $command === 'export:shopify' ? Exporter::shopify() : Exporter::woo();
+        $out = $args[0] ?? 'php://stdout';
+        file_put_contents($out, $csv);
+        exit(0);
+
+    case 'orders:expire':
+        $hours = (int)($args[0] ?? 48);
+        $cutoff = date('Y-m-d H:i:s', time() - $hours * 3600);
+        $n = 0;
+        foreach (DB::all("SELECT id FROM orders WHERE status = 'pending' AND payment_status = 'unpaid' AND payment_method IN ('stripe','paypal') AND created_at < ?", [$cutoff]) as $o) {
+            Orders::setStatus((int)$o['id'], 'cancelled');
+            $n++;
+        }
+        echo "Ordini online non pagati annullati: $n\n";
+        exit(0);
+
+    case 'cache:clear':
+        Cache::flush();
+        Themes::build(Alien\Core\View::theme());
+        echo "Cache svuotata.\n";
+        exit(0);
+
+    default:
+        echo "AlienShop " . ALIEN_VERSION . "\n\nComandi:\n"
+            . "  import:woocommerce <file.csv> [--no-images] [--no-update]\n"
+            . "  import:shopify <file.csv> [--no-images] [--no-update]\n"
+            . "  export:woocommerce [file.csv]\n  export:shopify [file.csv]\n"
+            . "  orders:expire [ore=48]   annulla ordini Stripe/PayPal non pagati (da usare in cron)\n"
+            . "  cache:clear\n";
+        exit($command === '' ? 0 : 1);
+}

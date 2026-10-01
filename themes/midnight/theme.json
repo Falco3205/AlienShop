@@ -1,0 +1,17 @@
+{
+  "name": "Midnight",
+  "description": "Tema scuro elegante con accenti neon.",
+  "colors": [
+    "#0e1018",
+    "#171a26",
+    "#7c5cff",
+    "#22d3ee"
+  ],
+  "layout": {
+    "header": "split",
+    "grid": 4,
+    "card": "shadow",
+    "hero": "full"
+  },
+  "version": "1.0.0"
+}

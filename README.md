@@ -1,2 +1,55 @@
 # AlienShop
-New ecommerce 
+
+E-commerce leggero e veloce in PHP, installabile con un wizard, con le funzionalità essenziali di Shopify:
+catalogo con attributi e varianti di prezzo, 10 temi, import/export WooCommerce e Shopify, pagamenti Stripe/PayPal/bonifico/contrassegno e SEO tecnico completo.
+
+Nessuna dipendenza (niente Composer, niente Node): si carica via FTP o si clona su qualsiasi hosting con PHP 8.1+.
+
+## Requisiti
+
+PHP 8.1+ con `pdo_sqlite` **o** `pdo_mysql`, `mbstring`, `gd` (con WebP), `curl`, `openssl`; consigliata `intl`. Apache (mod_rewrite) o Nginx.
+
+## Installazione
+
+1. Carica i file sul server. Il document root deve puntare a `public/` (con Apache su hosting condiviso funziona anche dalla radice grazie al `.htaccess` incluso). Per Nginx vedi `docs/nginx.conf`.
+2. Apri `https://tuodominio/install` e segui il wizard: requisiti → database (SQLite o MySQL) → negozio → amministratore → tema.
+3. Accedi a `/admin`.
+
+Dopo l'installazione `/install` non è più raggiungibile (`storage/installed.lock`).
+
+## Funzionalità
+
+- **Prodotti**: semplici o variabili, immagini multiple (ottimizzate in WebP, 3 dimensioni, `srcset`), categorie annidate, tag, marca, SKU, scorte, bozze, in evidenza.
+- **Attributi e variazioni di prezzo**: per ogni attributo si elencano i valori con delta di prezzo (`XL|+2.00`). Le varianti sono generate da tutte le combinazioni; il prezzo è `prezzo base + delta` oppure un override per singola variante, con scorte e SKU per variante.
+- **10 temi preinstallati**: Aurora, Midnight, Boutique, Minimal, Vivid, Nature, Tech, Luxe, Pastel, Brutalist. Anteprima, attivazione, colori, logo, hero e CSS personalizzati dal pannello.
+- **Import/Export**: CSV WooCommerce e Shopify (anche da CLI, `php bin/console import:woocommerce file.csv`). Import idempotente: un secondo import aggiorna invece di duplicare.
+- **Pagamenti**: Stripe Checkout (+ webhook firmato), PayPal Orders v2 (+ webhook verificato), bonifico, contrassegno. Nuovi gateway: aggiungi `app/Payments/XxxGateway.php` estendendo `Gateway`, viene rilevato da solo.
+- **Ordini**: stati, tracking, storico eventi, email transazionali (PHP mail o SMTP), ripristino scorte su annullo/rimborso, coupon (percentuale/fisso/spedizione gratuita), metodi e costi di spedizione per paese, IVA inclusa o esclusa.
+- **Clienti**: checkout ospite o con account, area ordini.
+- **Pagine e blog**, redirect 301 manuali e CSV.
+
+## SEO e performance
+
+- HTML pre-renderizzato in cache su file per home, prodotti, categorie, pagine e blog (invalidata a ogni modifica dal pannello), con `ETag`/`304` e gzip: le pagine in cache non toccano il database.
+- Un solo CSS e un solo JS (~3 KB) minificati con hash nel nome e cache di 1 anno; nessun framework, nessun font esterno.
+- Immagini WebP responsive con `width`/`height`, `loading="lazy"` e `fetchpriority` sull'immagine principale.
+- Title/meta description/canonical/Open Graph, JSON-LD `Product` (`Offer`/`AggregateOffer`), `BreadcrumbList`, `Organization`, `WebSite`+`SearchAction`, `BlogPosting`.
+- `sitemap.xml` (indice con sitemap per pagine, categorie e prodotti con immagini), `robots.txt`, feed Google Merchant (`/feeds/google.xml`), codici di verifica Google/Bing, GA4, **IndexNow** per notificare Bing a ogni modifica di prodotto.
+- Paginazione `prev/next`, `noindex` automatico su filtri, ricerca, carrello e account.
+- **Redirect 301 automatici**: cambiando lo slug di prodotti, categorie e pagine, o eliminandoli. Gli URL Shopify (`/products/handle`, `/collections/handle`, `/pages/handle`) restano identici; gli URL WooCommerce `/product/slug`, `/product-category/...`, `/shop` sono reindirizzati. Slash finale normalizzato con 301.
+
+## Manutenzione
+
+```
+php bin/console orders:expire 48   # annulla gli ordini Stripe/PayPal non pagati dopo 48h (cron)
+php bin/console cache:clear
+php tests/run.php                  # suite di test
+```
+
+## Sicurezza
+
+Password con `password_hash`, token CSRF su checkout/account/admin e controllo dell'origine sulle azioni del carrello, query preparate, escape dell'output, sanitizzazione dell'HTML, upload ricodificati con GD (nessun file originale servito), blocco SSRF nel download immagini, limite ai tentativi di login, header di sicurezza, cartelle `app/`, `config/`, `storage/` non esposte.
+
+## Pagamenti: configurazione
+
+`Admin → Pagamenti`. Stripe: chiave segreta e segreto del webhook (`/webhooks/stripe`). PayPal: Client ID, Secret, Webhook ID (`/webhooks/paypal`). Gli importi vengono sempre verificati lato server prima di segnare un ordine come pagato.

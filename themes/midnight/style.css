@@ -1,0 +1,8 @@
+:root{--bg:#0e1018;--surface:#171a26;--text:#eceefb;--muted:#9aa0bd;--primary:#7c5cff;--primary-contrast:#fff;--accent:#22d3ee;--border:#262a3d;--radius:12px;--shadow:0 10px 30px rgba(0,0,0,.45)}
+.site-header{background:rgba(14,16,24,.9);backdrop-filter:blur(8px)}
+.card{background:var(--surface)}.alert{color:var(--text)}
+input,select,textarea{background:#0e1018}.btn-outline{color:var(--text)}
+.hero-full .hero::before{background:linear-gradient(90deg,rgba(14,16,24,.92),rgba(14,16,24,.35))}
+.hero-full .hero{background-color:#171a26;background-image:radial-gradient(circle at 80% 20%,#3b2d8f 0,transparent 55%)}
+.pay-option,.ship-option,.summary{background:var(--surface)}
+.alert-success{background:#10281c;color:#a7f3c4}.alert-error{background:#331219;color:#fecdd3}

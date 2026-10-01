@@ -1,0 +1,5 @@
+:root{--bg:#fff;--surface:#eef3f9;--text:#0b1a2e;--muted:#5b6b82;--primary:#0b63f6;--primary-contrast:#fff;--accent:#00a58e;--border:#d9e2ef;--radius:3px;--heading-font:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;--heading-weight:700;--heading-spacing:-.02em}
+.hero-split{background:linear-gradient(135deg,#eaf1ff,#e5fbf7)}
+.card-title,.price{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.92rem}
+.btn{text-transform:uppercase;letter-spacing:.06em;font-size:.82rem}.tag{border-radius:2px}
+.card:hover{border-color:var(--primary)}

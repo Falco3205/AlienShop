@@ -1,0 +1,17 @@
+{
+  "name": "Boutique",
+  "description": "Editoriale con titoli serif, perfetto per moda e design.",
+  "colors": [
+    "#faf6f1",
+    "#efe6db",
+    "#8c5e3c",
+    "#b08968"
+  ],
+  "layout": {
+    "header": "center",
+    "grid": 3,
+    "card": "flat",
+    "hero": "minimal"
+  },
+  "version": "1.0.0"
+}

@@ -1,0 +1,17 @@
+{
+  "name": "Brutalist",
+  "description": "Bordi spessi, giallo acceso e carattere deciso.",
+  "colors": [
+    "#fffdf2",
+    "#ffe14d",
+    "#111111",
+    "#ff3b30"
+  ],
+  "layout": {
+    "header": "left",
+    "grid": 4,
+    "card": "border",
+    "hero": "split"
+  },
+  "version": "1.0.0"
+}

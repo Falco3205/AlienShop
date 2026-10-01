@@ -1,0 +1,17 @@
+{
+  "name": "Minimal",
+  "description": "Bianco e nero essenziale, tipografia pulita.",
+  "colors": [
+    "#ffffff",
+    "#f4f4f4",
+    "#000000",
+    "#767676"
+  ],
+  "layout": {
+    "header": "split",
+    "grid": 4,
+    "card": "flat",
+    "hero": "minimal"
+  },
+  "version": "1.0.0"
+}

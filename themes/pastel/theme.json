@@ -1,0 +1,17 @@
+{
+  "name": "Pastel",
+  "description": "Colori tenui e angoli arrotondati, delicato e accogliente.",
+  "colors": [
+    "#fffafc",
+    "#fde8f0",
+    "#e07aa5",
+    "#8aa8f8"
+  ],
+  "layout": {
+    "header": "split",
+    "grid": 4,
+    "card": "shadow",
+    "hero": "minimal"
+  },
+  "version": "1.0.0"
+}

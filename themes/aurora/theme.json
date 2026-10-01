@@ -1,0 +1,17 @@
+{
+  "name": "Aurora",
+  "description": "Moderno e luminoso, adatto a qualsiasi catalogo.",
+  "colors": [
+    "#ffffff",
+    "#f5f6fa",
+    "#4f46e5",
+    "#f43f5e"
+  ],
+  "layout": {
+    "header": "left",
+    "grid": 4,
+    "card": "border",
+    "hero": "split"
+  },
+  "version": "1.0.0"
+}

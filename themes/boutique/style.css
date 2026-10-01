@@ -1,0 +1,6 @@
+:root{--bg:#faf6f1;--surface:#efe6db;--text:#2b2118;--muted:#7d6e60;--primary:#2b2118;--primary-contrast:#faf6f1;--accent:#8c5e3c;--border:#e0d3c4;--radius:2px;--heading-font:Georgia,"Times New Roman",serif;--heading-weight:400;--card-img-ratio:4/5;--btn-transform:uppercase}
+body{font-family:Georgia,"Times New Roman",serif}
+.btn{letter-spacing:.12em;font-size:.82rem;font-family:system-ui,sans-serif}
+.card-title{font-weight:400;font-size:1.1rem}.price{font-family:system-ui,sans-serif;font-weight:500}
+.nav a{text-transform:uppercase;letter-spacing:.14em;font-size:.76rem;font-family:system-ui,sans-serif}
+.hero-minimal .hero{background:var(--surface)}

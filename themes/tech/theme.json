@@ -1,0 +1,17 @@
+{
+  "name": "Tech",
+  "description": "Taglio netto e tecnico per elettronica e gadget.",
+  "colors": [
+    "#ffffff",
+    "#eef3f9",
+    "#0b63f6",
+    "#00c2a8"
+  ],
+  "layout": {
+    "header": "left",
+    "grid": 4,
+    "card": "border",
+    "hero": "split"
+  },
+  "version": "1.0.0"
+}

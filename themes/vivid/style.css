@@ -1,0 +1,4 @@
+:root{--bg:#fff;--surface:#fff4e6;--text:#1e1633;--muted:#6f6786;--primary:#ff5a36;--primary-contrast:#fff;--accent:#7b2ff7;--border:#f1e3d0;--radius:18px;--heading-weight:800;--shadow:0 10px 30px rgba(123,47,247,.14)}
+.hero-split{background:linear-gradient(120deg,#ffe0cf,#e9d8ff)}
+.btn{border-radius:99px;box-shadow:0 6px 18px rgba(255,90,54,.35)}.tag{border-radius:99px;background:var(--accent)}
+.cat-tile{border-radius:22px;border:0;box-shadow:var(--shadow)}.opts label{border-radius:99px}
