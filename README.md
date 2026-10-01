@@ -25,6 +25,23 @@ E-commerce leggero e veloce in PHP, senza dipendenze, con un **pannello (Hub)** 
 
 Nomi usati nei comandi (cambiali con i tuoi): utente Hestia `falco3205`, hub `hub.falconefabio.it`. Valori da annotare: **IP_FRONTEND** (pubblico), **TS_BACKEND** (IP Tailscale del backend, `tailscale ip -4`).
 
+## La tua infrastruttura oggi e come ci si inserisce
+
+Situazione di partenza (dalle tue note) e cosa cambia con questa guida:
+
+| Oggi | Con AlienShop Hub |
+|---|---|
+| Le porte dei servizi backend (8010, 8080, 8095, 8096, 8097, 8765, 3002) non sono raggiungibili da Internet: UFW le blocca e accetta solo dall'IP della vecchia VPS | Stessa idea, più stretta: backend senza porte pubbliche, tutto passa da **Tailscale** (`ufw allow in on tailscale0`); il frontend è aperto solo agli IP di Cloudflare |
+| I database non sono mai esposti in rete (restano locali alla VPS che li usa) | Resta così: ogni negozio usa MySQL **locale** del backend (`localhost`), mai raggiungibile da fuori |
+| Il traffico pubblico è HTTPS, con WAF/DDoS dove c'è Cloudflare | Tutti i domini dei clienti passano da Cloudflare (nuvola arancione) verso il frontend |
+| Le app hanno la propria autenticazione (JWT, sessioni) | Anche qui: password robuste, **2FA** su hub e admin dei negozi, limiti di tentativi, firme HMAC tra hub e negozi. Non è un'alternativa alle porte chiuse: è il secondo livello |
+| Stai passando a Tailscale | È la scelta di base di questa guida (tailnet tra frontend, backend e il tuo portatile) |
+
+Due controlli da fare sempre dopo aver cambiato il firewall:
+
+1. **Scansione da fuori** (da un altro computer o rete): `nmap -Pn IP_PUBBLICO_BACKEND` e `nmap -Pn IP_FRONTEND`. Sul backend non deve risultare nessuna porta aperta; sul frontend solo 80/443 e, se hai un dominio dietro Cloudflare, solo da Cloudflare.
+2. **Docker e UFW**: le porte pubblicate da Docker (`-p 8080:8080`) **aggirano UFW**. Se i servizi 8010, 8080, 8095, 8096, 8097, 8765, 3002 girano in container, pubblicali su `127.0.0.1:PORTA:PORTA` (oppure nel compose `ports: ["127.0.0.1:8080:8080"]`) o regola la catena `DOCKER-USER`, altrimenti UFW "chiuso" non basta.
+
 ## Prima di cominciare
 
 1. Due VPS (Ubuntu/Debian) con **Hestia** e **PHP CLI 8.1+** (`php -v`), e un utente Hestia (`falco3205`) su entrambe. Se manca: `v-add-user falco3205 PASSWORD email@dominio.it`.
