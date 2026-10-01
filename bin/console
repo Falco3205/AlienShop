@@ -66,6 +66,20 @@ switch ($command) {
         echo "Ordini online non pagati annullati: $n\n";
         exit(0);
 
+    case 'user:password':
+        if (count($args) < 2 || strlen($args[1]) < 8) {
+            fwrite(STDERR, "Uso: console user:password <email> <nuova-password (min 8)>\n");
+            exit(1);
+        }
+        $u = DB::row('SELECT id FROM users WHERE email = ?', [mb_strtolower($args[0])]);
+        if (!$u) {
+            fwrite(STDERR, "Utente non trovato.\n");
+            exit(1);
+        }
+        Alien\Core\Auth::setPassword((int)$u['id'], $args[1]);
+        echo "Password aggiornata.\n";
+        exit(0);
+
     case 'cache:clear':
         Cache::flush();
         Themes::build(Alien\Core\View::theme());
@@ -78,6 +92,7 @@ switch ($command) {
             . "  import:shopify <file.csv> [--no-images] [--no-update]\n"
             . "  export:woocommerce [file.csv]\n  export:shopify [file.csv]\n"
             . "  orders:expire [ore=48]   annulla ordini Stripe/PayPal non pagati (da usare in cron)\n"
+            . "  user:password <email> <password>   reimposta la password di un utente\n"
             . "  cache:clear\n";
         exit($command === '' ? 0 : 1);
 }

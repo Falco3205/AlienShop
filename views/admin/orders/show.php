@@ -17,6 +17,8 @@
       <?= a_select('status', __('Cambia stato'), array_map('__', Alien\Services\Orders::STATUSES), $o['status']) ?>
       <?= a_input('tracking', __('Codice tracking'), $o['tracking']) ?>
       <button class="btn" type="submit"><?= e(__('Aggiorna')) ?></button></form>
+    <p style="margin-top:10px"><a class="btn sec sm" href="<?= e(url('admin/orders/' . $o['id'] . '/print')) ?>" target="_blank"><?= e(__('Stampa / packing slip')) ?></a></p>
+    <?php if ($o['payment_status'] === 'paid' && !in_array($o['status'], ['refunded'], true) && in_array($o['payment_method'], ['stripe', 'paypal'], true)): ?><form method="post" data-confirm="<?= e(__('Rimborsare l\'intero importo al cliente?')) ?>" style="margin-top:10px"><?= csrf_field() ?><input type="hidden" name="action" value="refund"><button class="btn danger sm" type="submit"><?= e(__('Rimborsa tramite gateway')) ?></button></form><?php endif ?>
     <?php if ($o['payment_status'] !== 'paid'): ?><form method="post" style="margin-top:10px"><?= csrf_field() ?><input type="hidden" name="action" value="paid"><button class="btn sec sm" type="submit"><?= e(__('Segna come pagato')) ?></button></form><?php endif ?></div>
   <div class="card"><h2><?= e(__('Cliente')) ?></h2><p><a href="mailto:<?= e($o['email']) ?>"><?= e($o['email']) ?></a><br><?= e($s['phone'] ?? '') ?></p>
     <h2><?= e(__('Spedizione')) ?></h2><p><?= e($s['name'] ?? '') ?><br><?= e($s['address'] ?? '') ?><br><?= e(($s['zip'] ?? '') . ' ' . ($s['city'] ?? '') . ' ' . ($s['state'] ?? '')) ?><br><?= e($s['country'] ?? '') ?></p>

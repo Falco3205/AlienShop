@@ -99,6 +99,9 @@ final class ProductsController extends AdminController
         foreach ((array)($post['remove_image'] ?? []) as $imgId) {
             Catalog::removeImage((int)$imgId);
         }
+        if (($main = (int)($post['main_image'] ?? 0)) > 0) {
+            Catalog::setMainImage($id, $main);
+        }
         $files = $_FILES['images'] ?? null;
         if ($files && is_array($files['name'])) {
             foreach ($files['name'] as $i => $n) {
@@ -121,6 +124,32 @@ final class ProductsController extends AdminController
             IndexNow::ping(['products/' . $p['slug']]);
         }
         return $this->back('admin/products/' . $id, __('Prodotto salvato.'));
+    }
+
+    public function duplicate(Request $req, array $params): Response
+    {
+        $p = Catalog::product((int)$params['id']);
+        if (!$p) {
+            return $this->back('admin/products', __('Prodotto non trovato.'), 'error');
+        }
+        $variants = array_map(static fn($v) => [
+            'key' => $v['options_key'], 'sku' => '', 'price' => $v['price'] === null ? '' : Money::input((int)$v['price']),
+            'compare_price' => $v['compare_price'] === null ? '' : Money::input((int)$v['compare_price']), 'stock' => $v['stock'], 'active' => $v['active'],
+        ], $p['variants']);
+        $id = Catalog::save([
+            'name' => $p['name'] . ' (' . __('copia') . ')', 'type' => $p['type'], 'status' => 'draft', 'sku' => '',
+            'short_description' => $p['short_description'], 'description' => $p['description'], 'price' => $p['price'],
+            'compare_price' => $p['compare_price'], 'manage_stock' => $p['manage_stock'], 'stock_qty' => $p['stock_qty'],
+            'weight' => $p['weight'], 'vendor' => $p['vendor'], 'tags' => $p['tags'], 'seo_title' => $p['seo_title'],
+            'seo_description' => $p['seo_description'], 'featured' => 0,
+            'category_ids' => array_column($p['categories'], 'id'),
+            'attributes' => array_map(static fn($a) => ['name' => $a['name'], 'values' => array_map(static fn($v) => ['value' => $v['value'], 'price_delta' => $v['price_delta']], $a['values'])], $p['attributes']),
+            'variants' => $variants,
+        ]);
+        foreach ($p['images'] as $img) {
+            Catalog::addImage($id, $img['path'], $img['alt']);
+        }
+        return $this->back('admin/products/' . $id, __('Prodotto duplicato come bozza.'));
     }
 
     public function delete(Request $req, array $params): Response

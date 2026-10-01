@@ -29,6 +29,7 @@ final class SettingsController extends AdminController
             ],
             __('Tasse e ordini') => [
                 ['tax_rate', __('Aliquota IVA / tasse (%)'), 'number', ['step' => '0.01']],
+                ['tax_country_rates', __('Aliquote per paese (una per riga, es. DE=19) — sovrascrivono quella predefinita'), 'textarea'],
                 ['prices_include_tax', __('I prezzi includono le tasse'), 'checkbox'],
                 ['order_prefix', __('Prefisso numero ordine'), 'text'],
                 ['products_per_page', __('Prodotti per pagina'), 'number'],

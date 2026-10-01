@@ -28,6 +28,24 @@ final class Redirects
         }
         DB::update('redirects', ['to_path' => $to], 'to_path = ? AND from_path <> ?', [$from, $to]);
         DB::delete('redirects', 'from_path = to_path');
+        DB::delete('not_found_log', 'path = ?', [$from]);
+    }
+
+    public static function logMissing(string $path): void
+    {
+        $path = self::normalize($path);
+        if ($path === '' || strlen($path) > 480 || preg_match('#^(assets|uploads|admin|wp-|\.)|\.(php|js|css|map|ico|png|jpg|webp|svg|txt|xml)$#i', $path)) {
+            return;
+        }
+        try {
+            if (DB::exec('UPDATE not_found_log SET hits = hits + 1, last_at = ? WHERE path = ?', [now(), $path]) === 0) {
+                if ((int)DB::val('SELECT COUNT(*) FROM not_found_log') >= 500) {
+                    DB::exec('DELETE FROM not_found_log WHERE id IN (SELECT id FROM (SELECT id FROM not_found_log ORDER BY hits ASC, last_at ASC LIMIT 50) t)');
+                }
+                DB::insert('not_found_log', ['path' => $path, 'hits' => 1, 'last_at' => now()]);
+            }
+        } catch (\Throwable) {
+        }
     }
 
     public static function remove(string $from): void

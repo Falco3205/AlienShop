@@ -47,6 +47,11 @@ abstract class Gateway
         return new Response('Not supported', 404);
     }
 
+    public function refund(array $order): ?string
+    {
+        return __('Questo metodo di pagamento non supporta i rimborsi automatici.');
+    }
+
     protected function amount(int $cents, string $currency): string
     {
         $zero = in_array($currency, ['JPY'], true);

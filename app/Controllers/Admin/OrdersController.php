@@ -43,12 +43,29 @@ final class OrdersController extends AdminController
                 Orders::setStatus((int)$order['id'], $req->str('status'), mb_substr($req->str('tracking'), 0, 190));
             } elseif ($action === 'paid') {
                 Orders::markPaid($order, 'manual');
+            } elseif ($action === 'refund') {
+                $gateway = \Alien\Payments\Registry::get($order['payment_method']);
+                $error = $order['payment_status'] !== 'paid' ? __('L\'ordine non risulta pagato.') : ($gateway ? $gateway->refund($order) : __('Metodo di pagamento sconosciuto.'));
+                if ($error !== null) {
+                    return $this->back('admin/orders/' . $order['id'], __('Rimborso non riuscito: %s', $error), 'error');
+                }
+                Orders::setStatus((int)$order['id'], 'refunded');
+                return $this->back('admin/orders/' . $order['id'], __('Rimborso eseguito.'));
             } elseif ($action === 'note' && $req->str('message') !== '') {
                 Orders::event((int)$order['id'], $req->str('message'));
             }
             return $this->back('admin/orders/' . $order['id'], __('Ordine aggiornato.'));
         }
         return $this->view('orders/show', ['title' => __('Ordine %s', $order['number']), 'o' => $order], 'orders');
+    }
+
+    public function printSlip(Request $req, array $params): Response
+    {
+        $order = Orders::find((int)$params['id']);
+        if (!$order) {
+            return $this->back('admin/orders', __('Ordine non trovato.'), 'error');
+        }
+        return new Response(\Alien\Core\View::admin('orders/print', ['o' => $order], false), 200, ['Content-Type' => 'text/html; charset=utf-8', 'Cache-Control' => 'private, no-store']);
     }
 
     public function customers(Request $req): Response

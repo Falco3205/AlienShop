@@ -170,7 +170,7 @@ final class Cart
         $selected ??= $methods[0] ?? null;
         $shipping = $selected ? Shipping::price($selected, $net, $coupon && (int)$coupon['free_shipping'] === 1) : 0;
 
-        $rate = (float)Settings::get('tax_rate', 0);
+        $rate = self::taxRate($country);
         $includes = (bool)Settings::get('prices_include_tax', 1);
         $taxable = $net + $shipping;
         $tax = $rate > 0 ? (int)round($includes ? $taxable * $rate / (100 + $rate) : $taxable * $rate / 100) : 0;
@@ -190,6 +190,16 @@ final class Cart
             'total' => max(0, $total),
             'count' => array_sum(array_column($lines, 'qty')),
         ];
+    }
+
+    public static function taxRate(string $country): float
+    {
+        foreach (preg_split('/\R+/', (string)Settings::get('tax_country_rates', '')) ?: [] as $line) {
+            if (preg_match('/^\s*([A-Za-z]{2})\s*[=:]\s*([0-9]+(?:[.,][0-9]+)?)\s*$/', $line, $m) && strtoupper($m[1]) === strtoupper($country)) {
+                return (float)str_replace(',', '.', $m[2]);
+            }
+        }
+        return (float)Settings::get('tax_rate', 0);
     }
 
     public static function applyCoupon(string $code): ?string

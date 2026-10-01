@@ -47,6 +47,7 @@ final class Routes
         $both('/admin/products/new', ProductsController::class, 'form');
         $both('/admin/products/{id}', ProductsController::class, 'form');
         $add('POST', '/admin/products/{id}/delete', ProductsController::class, 'delete');
+        $add('POST', '/admin/products/{id}/duplicate', ProductsController::class, 'duplicate');
         $add('POST', '/admin/products-bulk', ProductsController::class, 'bulk');
 
         $add('GET', '/admin/categories', CategoriesController::class, 'index');
@@ -56,6 +57,7 @@ final class Routes
 
         $add('GET', '/admin/orders', OrdersController::class, 'index');
         $both('/admin/orders/{id}', OrdersController::class, 'show');
+        $add('GET', '/admin/orders/{id}/print', OrdersController::class, 'printSlip');
         $add('GET', '/admin/customers', OrdersController::class, 'customers');
 
         foreach (['coupons' => CouponsController::class, 'shipping' => ShippingController::class, 'pages' => PagesController::class] as $slug => $class) {
@@ -66,12 +68,14 @@ final class Routes
         }
 
         $both('/admin/redirects', RedirectsController::class, 'index');
+        $add('POST', '/admin/redirects/{id}/dismiss', RedirectsController::class, 'clearMissing');
         $add('POST', '/admin/redirects/{id}/delete', RedirectsController::class, 'delete');
 
         $add('GET', '/admin/themes', ThemesController::class, 'index');
         $add('POST', '/admin/themes/activate', ThemesController::class, 'activate');
         $add('POST', '/admin/themes/customize', ThemesController::class, 'customize');
 
+        $both('/admin/profile', ProfileController::class, 'form');
         $both('/admin/settings', SettingsController::class, 'general');
         $both('/admin/settings/seo', SettingsController::class, 'seo');
         $both('/admin/settings/mail', SettingsController::class, 'mail');

@@ -113,6 +113,19 @@ final class PayPalGateway extends Gateway
         return $ok;
     }
 
+    public function refund(array $order): ?string
+    {
+        $capture = (string)$order['payment_ref'];
+        if ($capture === '') {
+            return __('Riferimento di pagamento PayPal mancante.');
+        }
+        $res = $this->api('POST', '/v2/payments/captures/' . rawurlencode($capture) . '/refund', null, ['PayPal-Request-Id: refund-' . $order['token']]);
+        if (in_array($res['status'], [200, 201], true) && in_array($res['json']['status'] ?? '', ['COMPLETED', 'PENDING'], true)) {
+            return null;
+        }
+        return (string)($res['json']['message'] ?? ($res['error'] ?: 'HTTP ' . $res['status']));
+    }
+
     public function handleWebhook(Request $req): Response
     {
         $body = $req->body();

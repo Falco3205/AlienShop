@@ -9,4 +9,5 @@
     <?= a_input('password', __('Password'), '', 'password', ['required' => true, 'autocomplete' => 'current-password']) ?>
     <button class="btn" style="width:100%;justify-content:center" type="submit"><?= e(__('Accedi')) ?></button>
   </form>
+  <p style="margin-top:14px;font-size:.9rem"><a href="<?= e(url('account/forgot')) ?>"><?= e(__('Password dimenticata?')) ?></a></p>
 </div></div></body></html>

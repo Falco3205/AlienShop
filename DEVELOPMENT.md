@@ -10,7 +10,7 @@ PHP 8.1+ senza dipendenze, PDO con SQLite o MySQL. Il front controller è `publi
 
 | Percorso | Contenuto |
 |---|---|
-| `app/Core` | App (routing, cache pagine, errori), Config, DB, Request/Response/Router, Session, Csrf, Auth, Settings, View (con fallback tema → `_base`), Lang, Money, Str, ImageProcessor (GD→WebP), Http (cURL + anti-SSRF), Mailer (mail/SMTP), Cache |
+| `app/Core` | App (routing, cache pagine, errori), Config, DB, Request/Response/Router, Session, Csrf, Auth, Settings, View (con fallback tema → `_base`), Lang, Money, Str, ImageProcessor (GD→WebP), Http (cURL + anti-SSRF, reset password, rimborsi, IVA per paese, log 404, immagine principale), Mailer (mail/SMTP), Cache |
 | `app/Services` | Catalog (prodotti, attributi, varianti, categorie), Cart, Coupons, Shipping, Orders, Redirects, Seo, Sitemap, IndexNow, Themes, Installer, Demo |
 | `app/Payments` | `Gateway` astratto, Stripe, PayPal, Bank, Cod, `Registry` (auto-discovery di `*Gateway.php`) |
 | `app/Import` | CsvReader, Writer, WooImporter, ShopifyImporter, Exporter, Result |
@@ -27,6 +27,10 @@ PHP 8.1+ senza dipendenze, PDO con SQLite o MySQL. Il front controller è `publi
 
 **Prezzi e varianti.** `product_attributes` + `attribute_values.price_delta` definiscono i valori e il loro delta. `Catalog::save()` rigenera le varianti come prodotto cartesiano preservando SKU/prezzo/scorte di quelle esistenti (chiave `options_key`, hash delle opzioni). Prezzo variante = `variants.price` se valorizzato, altrimenti prezzo base + somma dei delta (`Catalog::variantPrice`). `products.price_min/max/in_stock` sono denormalizzati da `refreshDerived()` per liste, ordinamento e JSON-LD.
 
+**Recupero password.** Token senza stato (`Auth::resetToken`): HMAC con `app.key` su id, scadenza e un frammento dell'hash della password, quindi diventa invalido dopo l'uso. Risposta identica per email esistenti e non (niente enumerazione) e limite ai tentativi.
+
+**Rimborsi.** `Gateway::refund()` (Stripe `/v1/refunds` sul `payment_intent`, PayPal `/captures/{id}/refund`); l'ordine passa a `refunded` solo se il gateway conferma.
+
 **Redirect.** `Redirects::add()` appiattisce le catene. Ogni cambio slug in `Catalog::save/saveCategory` e nelle pagine crea un 301; una pagina 404 per un URL sconosciuto consulta la tabella prima di rispondere.
 
 **Cache.** `App::run()` serve le pagine pubbliche da `storage/cache/pages` prima di aprire il database. Il carrello è mostrato via cookie `as_cart` letto da JS, quindi l'HTML è identico per tutti. Gli admin (cookie `as_admin`) la saltano; `Cache::flush()` parte dopo ogni POST admin.
@@ -39,7 +43,7 @@ PHP 8.1+ senza dipendenze, PDO con SQLite o MySQL. Il front controller è `publi
 
 ## Verifica eseguita
 
-`php tests/run.php` (27 test: formati monetari, prezzi variante, redirect, carrello, scorte, coupon, firme Stripe, flusso Stripe/PayPal con HTTP simulato, SEO, import/export con round trip, anti-SSRF). Test manuali via browser: wizard, tutte le pagine admin, flusso carrello→checkout→ordine, cache/304/gzip, redirect, anteprima dei 10 temi.
+`php tests/run.php` (32 test: formati monetari, prezzi variante, redirect, carrello, scorte, coupon, firme Stripe, flusso Stripe/PayPal con HTTP simulato, SEO, import/export con round trip, anti-SSRF, reset password, rimborsi, IVA per paese, log 404, immagine principale). Test manuali via browser: wizard, tutte le pagine admin, flusso carrello→checkout→ordine, cache/304/gzip, redirect, anteprima dei 10 temi.
 
 **Non verificato con servizi reali**: chiamate a Stripe, PayPal, SMTP e IndexNow (nessuna credenziale/rete nel test); sono coperte solo con risposte simulate e verifica delle firme.
 

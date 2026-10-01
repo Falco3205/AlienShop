@@ -25,7 +25,9 @@ Dopo l'installazione `/install` non è più raggiungibile (`storage/installed.lo
 - **Import/Export**: CSV WooCommerce e Shopify (anche da CLI, `php bin/console import:woocommerce file.csv`). Import idempotente: un secondo import aggiorna invece di duplicare.
 - **Pagamenti**: Stripe Checkout (+ webhook firmato), PayPal Orders v2 (+ webhook verificato), bonifico, contrassegno. Nuovi gateway: aggiungi `app/Payments/XxxGateway.php` estendendo `Gateway`, viene rilevato da solo.
 - **Ordini**: stati, tracking, storico eventi, email transazionali (PHP mail o SMTP), ripristino scorte su annullo/rimborso, coupon (percentuale/fisso/spedizione gratuita), metodi e costi di spedizione per paese, IVA inclusa o esclusa.
-- **Clienti**: checkout ospite o con account, area ordini.
+- **Clienti**: checkout ospite o con account, area ordini, profilo, recupero password via email.
+- **Rimborsi**: dal pannello ordine, con rimborso automatico su Stripe e PayPal e ripristino delle scorte. Stampa packing slip.
+- **Admin**: duplica prodotto, immagine principale, editor HTML con barra strumenti, profilo e cambio password, IVA per paese.
 - **Pagine e blog**, redirect 301 manuali e CSV.
 
 ## SEO e performance
@@ -35,6 +37,7 @@ Dopo l'installazione `/install` non è più raggiungibile (`storage/installed.lo
 - Immagini WebP responsive con `width`/`height`, `loading="lazy"` e `fetchpriority` sull'immagine principale.
 - Title/meta description/canonical/Open Graph, JSON-LD `Product` (`Offer`/`AggregateOffer`), `BreadcrumbList`, `Organization`, `WebSite`+`SearchAction`, `BlogPosting`.
 - `sitemap.xml` (indice con sitemap per pagine, categorie e prodotti con immagini), `robots.txt`, feed Google Merchant (`/feeds/google.xml`), codici di verifica Google/Bing, GA4, **IndexNow** per notificare Bing a ogni modifica di prodotto.
+- **Log dei 404**: le pagine inesistenti più richieste compaiono in `Admin → Redirect 301` con creazione del redirect in un click.
 - Paginazione `prev/next`, `noindex` automatico su filtri, ricerca, carrello e account.
 - **Redirect 301 automatici**: cambiando lo slug di prodotti, categorie e pagine, o eliminandoli. Gli URL Shopify (`/products/handle`, `/collections/handle`, `/pages/handle`) restano identici; gli URL WooCommerce `/product/slug`, `/product-category/...`, `/shop` sono reindirizzati. Slash finale normalizzato con 301.
 
@@ -43,6 +46,7 @@ Dopo l'installazione `/install` non è più raggiungibile (`storage/installed.lo
 ```
 php bin/console orders:expire 48   # annulla gli ordini Stripe/PayPal non pagati dopo 48h (cron)
 php bin/console cache:clear
+php bin/console user:password email@dominio.it nuova-password   # recupero accesso admin
 php tests/run.php                  # suite di test
 ```
 

@@ -34,6 +34,7 @@ $nav = [
   <?php endforeach ?>
   </nav>
   <div class="side-foot"><a href="<?= e(url()) ?>" target="_blank" rel="noopener">↗ <?= e(__('Vedi il negozio')) ?></a>
+    <a href="<?= e(url('admin/profile')) ?>"><?= e(__('Profilo')) ?></a>
     <form method="post" action="<?= e(url('admin/logout')) ?>"><?= csrf_field() ?><button type="submit"><?= e(__('Esci')) ?></button></form></div>
 </aside>
 <div class="main">

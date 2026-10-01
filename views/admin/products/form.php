@@ -17,11 +17,11 @@ $tpl = static function (string $i, string $name = '', string $values = ''): stri
   <div class="card"><h2><?= e(__('Informazioni')) ?></h2>
     <?= a_input('name', __('Nome'), $v('name'), 'text', ['required' => true]) ?>
     <?= a_textarea('short_description', __('Descrizione breve'), $v('short_description'), 3) ?>
-    <?= a_textarea('description', __('Descrizione completa (HTML)'), $v('description'), 10) ?>
+    <?= a_textarea('description', __('Descrizione completa (HTML)'), $v('description'), 10, '', true) ?>
   </div>
 
   <div class="card"><h2><?= e(__('Immagini')) ?></h2>
-    <?php if (!empty($p['images'])): ?><div class="imgs"><?php foreach ($p['images'] as $im): ?><figure><img src="<?= e(upload_url($im['path'], 400)) ?>" alt=""><label title="<?= e(__('Rimuovi')) ?>" style="position:absolute;top:3px;right:3px;background:rgba(0,0,0,.65);color:#fff;border-radius:6px;padding:2px 6px;font-size:.75rem;cursor:pointer;margin:0"><input type="checkbox" name="remove_image[]" value="<?= (int)$im['id'] ?>"> ✕</label></figure><?php endforeach ?></div><div class="help" style="margin-bottom:12px"><?= e(__('La prima immagine è quella principale. Spunta ✕ per rimuovere.')) ?></div><?php endif ?>
+    <?php if (!empty($p['images'])): ?><div class="imgs"><?php foreach ($p['images'] as $im): ?><figure><img src="<?= e(upload_url($im['path'], 400)) ?>" alt=""><label title="<?= e(__('Rimuovi')) ?>" style="position:absolute;top:3px;right:3px;background:rgba(0,0,0,.65);color:#fff;border-radius:6px;padding:2px 6px;font-size:.75rem;cursor:pointer;margin:0"><input type="checkbox" name="remove_image[]" value="<?= (int)$im['id'] ?>"> ✕</label><label style="display:block;text-align:center;font-size:.72rem;font-weight:500"><input type="radio" name="main_image" value="<?= (int)$im['id'] ?>"> <?= e(__('Principale')) ?></label></figure><?php endforeach ?></div><div class="help" style="margin-bottom:12px"><?= e(__('La prima immagine è quella principale. Spunta ✕ per rimuovere.')) ?></div><?php endif ?>
     <div class="field"><label for="images"><?= e(__('Carica immagini')) ?></label><input id="images" type="file" name="images[]" accept="image/jpeg,image/png,image/webp,image/gif" multiple><div class="help"><?= e(__('Vengono ottimizzate e convertite automaticamente in WebP con più dimensioni.')) ?></div></div>
     <?= a_textarea('image_urls', __('Oppure importa da URL (uno per riga)'), '', 2) ?>
   </div>
@@ -88,10 +88,12 @@ $tpl = static function (string $i, string $name = '', string $values = ''): stri
   </div>
   <?php if (!$isNew): ?>
   <div class="card"><h2><?= e(__('Zona pericolosa')) ?></h2>
+    <button class="btn sec" type="submit" form="duplicate-form"><?= e(__('Duplica')) ?></button>
     <button class="btn danger" type="submit" form="delete-form"><?= e(__('Elimina prodotto')) ?></button></div>
   <?php endif ?>
 </div>
 </div>
 <div class="sticky-save"><button class="btn" type="submit"><?= e(__('Salva prodotto')) ?></button><a class="btn sec" href="<?= e(url('admin/products')) ?>"><?= e(__('Annulla')) ?></a></div>
 </form>
-<?php if (!$isNew): ?><form id="delete-form" method="post" action="<?= e(url('admin/products/' . $p['id'] . '/delete')) ?>" data-confirm="<?= e(__('Eliminare definitivamente questo prodotto?')) ?>"><?= csrf_field() ?></form><?php endif ?>
+<?php if (!$isNew): ?><form id="duplicate-form" method="post" action="<?= e(url('admin/products/' . $p['id'] . '/duplicate')) ?>"><?= csrf_field() ?></form>
+<form id="delete-form" method="post" action="<?= e(url('admin/products/' . $p['id'] . '/delete')) ?>" data-confirm="<?= e(__('Eliminare definitivamente questo prodotto?')) ?>"><?= csrf_field() ?></form><?php endif ?>

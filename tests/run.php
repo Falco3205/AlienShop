@@ -327,6 +327,61 @@ t('Http::isPublicUrl blocca indirizzi privati (SSRF)', function () {
     eq(Http::isPublicUrl('http://10.0.0.5/a'), false);
 });
 
+out("Nuove funzioni\n");
+t('reset password: token valido, scaduto, manomesso e monouso', function () {
+    \Alien\Core\Config::write(['app' => ['url' => 'http://shop.test', 'key' => 'k'], 'db' => []]);
+    $uid = Alien\Core\Auth::create('reset@test.dev', 'password-old-1', 'R');
+    $user = DB::row('SELECT * FROM users WHERE id = ?', [$uid]);
+    $token = Alien\Core\Auth::resetToken($user);
+    eq((int)Alien\Core\Auth::userFromResetToken($token)['id'], $uid);
+    eq(Alien\Core\Auth::userFromResetToken(Alien\Core\Auth::resetToken($user, time() - 5)), null, 'scaduto');
+    eq(Alien\Core\Auth::userFromResetToken($token . 'x'), null, 'manomesso');
+    Alien\Core\Auth::setPassword($uid, 'password-new-2');
+    eq(Alien\Core\Auth::userFromResetToken($token), null, 'usato una volta');
+    @unlink(ROOT . '/config/config.php');
+});
+t('tasse per paese', function () {
+    Settings::set('tax_country_rates', "DE=19\nfr = 20,5");
+    eq(Cart::taxRate('DE'), 19.0);
+    eq(Cart::taxRate('FR'), 20.5);
+    eq(Cart::taxRate('IT'), 22.0);
+});
+t('rimborso Stripe e PayPal tramite gateway', function () {
+    $calls = [];
+    Http::$fake = function ($m, $url, $body) use (&$calls) {
+        $calls[] = [$m, $url, $body];
+        if (str_contains($url, '/oauth2/token')) {
+            return ['status' => 200, 'body' => '', 'error' => '', 'json' => ['access_token' => 't']];
+        }
+        return ['status' => 200, 'body' => '', 'error' => '', 'json' => ['status' => str_contains($url, 'paypal') ? 'COMPLETED' : 'succeeded']];
+    };
+    eq((new StripeGateway())->refund(['payment_ref' => 'pi_123', 'token' => 'x']), null);
+    eq($calls[0][1], 'https://api.stripe.com/v1/refunds');
+    eq($calls[0][2], ['payment_intent' => 'pi_123']);
+    eq((new StripeGateway())->refund(['payment_ref' => '', 'token' => 'x']) !== null, true);
+    eq((new PayPalGateway())->refund(['payment_ref' => 'CAP1', 'token' => 'x']), null);
+    eq(str_contains(end($calls)[1], '/v2/payments/captures/CAP1/refund'), true);
+    Http::$fake = null;
+});
+t('log 404 e redirect creato dal log', function () {
+    Redirects::logMissing('/vecchio-url-test');
+    Redirects::logMissing('/vecchio-url-test');
+    Redirects::logMissing('/assets/x.css');
+    eq((int)DB::val("SELECT hits FROM not_found_log WHERE path = 'vecchio-url-test'"), 2);
+    eq((int)DB::val("SELECT COUNT(*) FROM not_found_log WHERE path LIKE 'assets%'"), 0);
+    Redirects::add('/vecchio-url-test', '/collections/all');
+    eq((int)DB::val("SELECT COUNT(*) FROM not_found_log WHERE path = 'vecchio-url-test'"), 0);
+});
+t('immagine principale riordina le immagini', function () {
+    $id = Catalog::save(['name' => 'Img test', 'price' => 100]);
+    Catalog::addImage($id, 'a.webp');
+    Catalog::addImage($id, 'b.webp');
+    $second = (int)DB::val("SELECT id FROM product_images WHERE path = 'b.webp'");
+    Catalog::setMainImage($id, $second);
+    eq(Catalog::product($id)['image'], 'b.webp');
+    DB::delete('product_images', 'product_id = ?', [$id]);
+});
+
 out("\n$passed ok, $failed falliti\n");
 array_map('unlink', glob($tmp . '/*') ?: []);
 @rmdir($tmp);

@@ -80,6 +80,7 @@ final class App
 
     public static function notFound(): Response
     {
+        Redirects::logMissing(Request::current()->path);
         Seo::set(['title' => __('Pagina non trovata')]);
         Seo::noindex();
         return Response::notFound(View::render('404'));
@@ -116,6 +117,9 @@ final class App
         $r->any('/account/login', [AccountController::class, 'login']);
         $r->any('/account/register', [AccountController::class, 'register']);
         $r->post('/account/logout', [AccountController::class, 'logout']);
+        $r->any('/account/forgot', [AccountController::class, 'forgot']);
+        $r->any('/account/reset/{token}', [AccountController::class, 'reset']);
+        $r->post('/account/profile', [AccountController::class, 'profile']);
 
         $r->get('/sitemap.xml', [SeoController::class, 'sitemapIndex']);
         $r->get('/sitemap-pages.xml', [SeoController::class, 'sitemapPages']);

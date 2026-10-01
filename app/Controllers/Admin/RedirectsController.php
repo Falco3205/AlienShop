@@ -26,7 +26,14 @@ final class RedirectsController extends AdminController
         return $this->view('redirects/index', [
             'title' => __('Redirect 301'),
             'rows' => DB::all('SELECT * FROM redirects ORDER BY id DESC LIMIT 500'),
+            'missing' => DB::all('SELECT * FROM not_found_log ORDER BY hits DESC, last_at DESC LIMIT 30'),
         ], 'redirects');
+    }
+
+    public function clearMissing(Request $req, array $params): Response
+    {
+        DB::delete('not_found_log', 'id = ?', [(int)$params['id']]);
+        return $this->back('admin/redirects');
     }
 
     public function delete(Request $req, array $params): Response

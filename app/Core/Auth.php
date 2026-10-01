@@ -78,4 +78,35 @@ final class Auth
             'created_at' => now(),
         ]);
     }
+
+    public static function hit(): void
+    {
+        DB::insert('login_attempts', ['ip' => request()->ip(), 'created_at' => time()]);
+    }
+
+    public static function resetToken(array $user, ?int $expires = null): string
+    {
+        $expires ??= time() + 3600;
+        return $user['id'] . '.' . $expires . '.' . self::resetSignature($user, $expires);
+    }
+
+    private static function resetSignature(array $user, int $expires): string
+    {
+        return hash_hmac('sha256', $user['id'] . '|' . $expires . '|' . substr(hash('sha256', (string)$user['password']), 0, 16), (string)Config::get('app.key', ''));
+    }
+
+    public static function userFromResetToken(string $token): ?array
+    {
+        $parts = explode('.', $token);
+        if (count($parts) !== 3 || !ctype_digit($parts[0]) || !ctype_digit($parts[1]) || (int)$parts[1] < time()) {
+            return null;
+        }
+        $user = DB::row('SELECT * FROM users WHERE id = ?', [(int)$parts[0]]);
+        return $user && hash_equals(self::resetSignature($user, (int)$parts[1]), $parts[2]) ? $user : null;
+    }
+
+    public static function setPassword(int $userId, string $password): void
+    {
+        DB::update('users', ['password' => password_hash($password, PASSWORD_DEFAULT)], 'id = ?', [$userId]);
+    }
 }

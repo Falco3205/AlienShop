@@ -5,6 +5,8 @@ namespace Alien\Controllers;
 
 use Alien\Core\Auth;
 use Alien\Core\DB;
+use Alien\Core\Mailer;
+use Alien\Core\Settings;
 use Alien\Core\Request;
 use Alien\Core\Response;
 use Alien\Services\Orders;
@@ -77,5 +79,77 @@ final class AccountController extends Controller
             setcookie('as_admin', '', time() - 3600, '/');
         }
         return Response::redirect(url());
+    }
+
+    public function forgot(Request $req): Response
+    {
+        $data = [];
+        if ($req->isPost()) {
+            if ($this->csrfFails($req)) {
+                $data['error'] = __('Sessione scaduta, riprova.');
+            } elseif (Auth::tooManyAttempts()) {
+                $data['error'] = __('Troppi tentativi. Riprova tra qualche minuto.');
+            } else {
+                Auth::hit();
+                $user = DB::row('SELECT * FROM users WHERE email = ?', [mb_strtolower($req->str('email'))]);
+                if ($user) {
+                    $link = url('account/reset/' . Auth::resetToken($user));
+                    Mailer::send($user['email'], __('Reimposta la tua password'), '<p>' . e(__('Hai richiesto di reimpostare la password di %s.', Settings::get('store_name', ''))) . '</p><p><a href="' . e($link) . '">' . e(__('Scegli una nuova password')) . '</a></p><p>' . e(__('Il link è valido per un\'ora. Se non sei stato tu, ignora questa email.')) . '</p>');
+                }
+                $data['sent'] = true;
+            }
+        }
+        Seo::set(['title' => __('Password dimenticata')]);
+        Seo::noindex();
+        return $this->noStore($this->render('account/forgot', $data));
+    }
+
+    public function reset(Request $req, array $params): Response
+    {
+        $user = Auth::userFromResetToken($params['token']);
+        $data = ['token' => $params['token'], 'valid' => $user !== null];
+        if ($user && $req->isPost()) {
+            $password = (string)($req->post['password'] ?? '');
+            if ($this->csrfFails($req)) {
+                $data['error'] = __('Sessione scaduta, riprova.');
+            } elseif (strlen($password) < 8) {
+                $data['error'] = __('La password deve avere almeno 8 caratteri.');
+            } else {
+                Auth::setPassword((int)$user['id'], $password);
+                flash('success', __('Password aggiornata. Ora puoi accedere.'));
+                return Response::redirect('account/login');
+            }
+        }
+        Seo::set(['title' => __('Reimposta password')]);
+        Seo::noindex();
+        return $this->noStore($this->render('account/reset', $data));
+    }
+
+    public function profile(Request $req): Response
+    {
+        $user = Auth::user();
+        if (!$user) {
+            return Response::redirect('account/login');
+        }
+        if ($this->csrfFails($req)) {
+            flash('error', __('Sessione scaduta, riprova.'));
+            return Response::redirect('account');
+        }
+        $name = mb_substr($req->str('name'), 0, 190);
+        if ($name === '') {
+            flash('error', __('Compila tutti i campi correttamente.'));
+            return Response::redirect('account');
+        }
+        DB::update('users', ['name' => $name, 'phone' => mb_substr($req->str('phone'), 0, 60)], 'id = ?', [$user['id']]);
+        $password = (string)($req->post['password'] ?? '');
+        if ($password !== '') {
+            if (strlen($password) < 8) {
+                flash('error', __('La password deve avere almeno 8 caratteri.'));
+                return Response::redirect('account');
+            }
+            Auth::setPassword((int)$user['id'], $password);
+        }
+        flash('success', __('Profilo aggiornato.'));
+        return Response::redirect('account');
     }
 }

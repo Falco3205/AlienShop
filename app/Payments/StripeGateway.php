@@ -115,6 +115,19 @@ final class StripeGateway extends Gateway
         return false;
     }
 
+    public function refund(array $order): ?string
+    {
+        $ref = (string)$order['payment_ref'];
+        if (!str_starts_with($ref, 'pi_')) {
+            return __('Riferimento di pagamento Stripe mancante.');
+        }
+        $res = $this->call('POST', '/refunds', ['payment_intent' => $ref]);
+        if ($res['status'] === 200 && in_array($res['json']['status'] ?? '', ['succeeded', 'pending'], true)) {
+            return null;
+        }
+        return (string)($res['json']['error']['message'] ?? ($res['error'] ?: 'HTTP ' . $res['status']));
+    }
+
     public function handleWebhook(Request $req): Response
     {
         $payload = $req->body();

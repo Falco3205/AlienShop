@@ -222,3 +222,11 @@ CREATE TABLE IF NOT EXISTS login_attempts (
   created_at INTEGER NOT NULL
 ){ENGINE};
 CREATE INDEX idx_la_ip ON login_attempts (ip, created_at);
+
+CREATE TABLE IF NOT EXISTS not_found_log (
+  id {PK},
+  path VARCHAR(500) NOT NULL,
+  hits INTEGER NOT NULL DEFAULT 1,
+  last_at VARCHAR(19) NOT NULL
+){ENGINE};
+CREATE UNIQUE INDEX idx_nf_path ON not_found_log (path);

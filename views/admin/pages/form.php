@@ -2,7 +2,7 @@
 <form method="post" enctype="multipart/form-data" action="<?= e(url('admin/pages/' . ($isNew ? 'new' : $p['id']))) ?>"><?= csrf_field() ?>
 <div class="grid2"><div>
 <div class="card"><?= a_input('title', __('Titolo'), $v('title'), 'text', ['required' => true]) ?>
-<?= a_textarea('content', __('Contenuto (HTML)'), $v('content'), 16) ?>
+<?= a_textarea('content', __('Contenuto (HTML)'), $v('content'), 16, '', true) ?>
 <?= a_textarea('excerpt', __('Riassunto'), $v('excerpt'), 2) ?></div>
 <div class="card"><h2>SEO</h2><?= a_input('slug', 'Slug', $v('slug')) ?><?= a_input('seo_title', __('Titolo SEO'), $v('seo_title')) ?><?= a_textarea('seo_description', __('Meta description'), $v('seo_description'), 2) ?></div></div>
 <div><div class="card">

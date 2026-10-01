@@ -419,6 +419,19 @@ final class Catalog
         self::refreshDerived($productId);
     }
 
+    public static function setMainImage(int $productId, int $imageId): void
+    {
+        $ids = DB::col('SELECT id FROM product_images WHERE product_id = ? ORDER BY position, id', [$productId]);
+        if (!in_array((string)$imageId, array_map('strval', $ids), true)) {
+            return;
+        }
+        $ordered = [$imageId, ...array_filter(array_map('intval', $ids), static fn($i) => $i !== $imageId)];
+        foreach ($ordered as $pos => $id) {
+            DB::update('product_images', ['position' => $pos], 'id = ?', [$id]);
+        }
+        self::refreshDerived($productId);
+    }
+
     public static function removeImage(int $imageId): void
     {
         $img = DB::row('SELECT * FROM product_images WHERE id = ?', [$imageId]);
