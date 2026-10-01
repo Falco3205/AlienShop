@@ -24,12 +24,12 @@ final class NodesController extends Controller
     public function create(Request $req): Response
     {
         $errors = [];
-        $in = ['name' => '', 'role' => 'backend', 'address' => '', 'upstream' => '', 'trusted' => '', 'tunnel_host' => '', 'hestia_user' => ''];
+        $in = ['name' => '', 'role' => 'backend', 'address' => '', 'upstream' => '', 'trusted' => '', 'hestia_user' => ''];
         if ($req->isPost()) {
             foreach (array_keys($in) as $k) {
                 $in[$k] = $req->str($k);
             }
-            [$id, $token, $errors] = Nodes::create($in['name'], $in['role'], $in['address'], $in['upstream'], $in['hestia_user'], $in['trusted'], $in['tunnel_host']);
+            [$id, $token, $errors] = Nodes::create($in['name'], $in['role'], $in['address'], $in['upstream'], $in['hestia_user'], $in['trusted']);
             if ($id) {
                 $_SESSION['new_token_' . $id] = $token;
                 return $this->back('nodes/' . $id);
@@ -73,8 +73,8 @@ final class NodesController extends Controller
     {
         $repo = (string)Settings::get('shop_repo', 'Falco3205/AlienShop');
         $branch = (string)Settings::get('shop_branch', 'main');
-        $relay = $node['role'] === 'backend' && $node['relay_secret'] !== '' ? ' --relay-secret ' . $node['relay_secret'] : '';
+        $flags = $node['role'] === 'edge' ? ' --user ' . $node['hestia_user'] . ' --cloudflare' : '';
         return 'curl -fsSL https://raw.githubusercontent.com/' . $repo . '/' . $branch . '/node/setup.sh -o setup.sh && sudo ALIEN_NODE_TOKEN=' . $token . ' bash setup.sh --hub ' . Config::baseUrl()
-            . ' --role ' . $node['role'] . ' --user ' . $node['hestia_user'] . (Nodes::tailnet($node) ? ' --tailscale' : ' --cloudflare') . $relay . ' --repo ' . $repo . ' --branch ' . $branch;
+            . ' --role ' . $node['role'] . $flags . ' --repo ' . $repo . ' --branch ' . $branch;
     }
 }

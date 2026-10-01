@@ -2,7 +2,7 @@
 <?php
 declare(strict_types=1);
 
-const AGENT_VERSION = '1.0.0';
+const AGENT_VERSION = '2.0.0';
 
 final class Node
 {
@@ -13,7 +13,7 @@ final class Node
 
     public function __construct(array $cfg, bool $dry = false)
     {
-        $this->cfg = $cfg + ['hestia' => '/usr/local/hestia', 'users' => [], 'repo' => 'Falco3205/AlienShop', 'branch' => 'main'];
+        $this->cfg = $cfg + ['hestia' => '/usr/local/hestia', 'users' => [], 'repo' => 'Falco3205/AlienShop', 'branch' => 'main', 'role' => 'backend'];
         $this->dry = $dry;
     }
 
@@ -25,7 +25,9 @@ final class Node
             fwrite(STDERR, "Configurazione mancante o incompleta: $file\n");
             exit(1);
         }
-        return $cfg;
+        $stackFile = getenv('ALIENSHOP_STACK_CONF') ?: '/etc/alienshop/stack.json';
+        $stack = is_file($stackFile) ? json_decode((string)file_get_contents($stackFile), true) : null;
+        return $cfg + (is_array($stack) ? $stack : []);
     }
 
     public function say(string $line): void
@@ -94,6 +96,7 @@ final class Node
     public function execute(int $id, string $type, array $p): void
     {
         $this->log = [];
+        $this->redact = [];
         try {
             $result = match ($type) {
                 'install_shop' => $this->installShop($p),
@@ -118,19 +121,6 @@ final class Node
         $this->http('POST', '/api/node/jobs/' . $id, ['ok' => $ok, 'result' => $result, 'error' => $error, 'log' => implode("\n", $this->log)]);
     }
 
-    public function claim(string $user, string $domain, string $path, bool $skipTemplate): int
-    {
-        $r = $this->http('POST', '/api/node/claim', ['user' => $user, 'domain' => $domain, 'path' => $path]);
-        if ($r['status'] !== 200 || empty($r['json']['payload'])) {
-            fwrite(STDERR, 'Claim rifiutato: ' . ($r['json']['error'] ?? 'HTTP ' . $r['status']) . "\n");
-            return 1;
-        }
-        $payload = $r['json']['payload'];
-        $payload['skip_template'] = $skipTemplate;
-        $this->execute((int)$r['json']['job_id'], 'install_shop', $payload);
-        return 0;
-    }
-
     private function validate(array $p, array $rules): void
     {
         $patterns = [
@@ -144,7 +134,6 @@ final class Node
             'secret' => '/^[0-9a-f]{20,128}$/',
             'url' => '#^https?://[\w.\-]+(:\d+)?(/[a-z0-9_-]+)?$#',
             'upstream' => '#^https?://[\w.\-\[\]:]+$#',
-            'host' => '/^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,24}$/',
         ];
         foreach ($rules as $key => $kind) {
             if (!isset($p[$key]) || !is_string($p[$key]) || !preg_match($patterns[$kind] . 'D', $p[$key])) {
@@ -159,20 +148,24 @@ final class Node
         }
     }
 
-    public function sh(array $cmd, ?string $user = null, array $env = [], bool $mustSucceed = true): array
+    public function sh(array $cmd, ?string $user = null, array $env = [], bool $mustSucceed = true, ?string $stdin = null): array
     {
         if ($user !== null) {
             $cmd = ['runuser', '-u', $user, '--', ...$cmd];
         }
-        $shown = implode(' ', array_map(static fn($a) => preg_match('/^[\w@%+=:,.\/-]+$/D', $a) ? $a : "'" . str_replace("'", "'\\''", $a) . "'", $cmd));
-        $this->say('$ ' . $shown);
+        $shown = implode(' ', array_map(static fn($a) => preg_match('/^[\w@%+=:,.\/-]+$/', $a) ? $a : "'" . str_replace("'", "'\\''", $a) . "'", $cmd));
+        $this->say('$ ' . $shown . ($stdin !== null ? ' < (SQL)' : ''));
         if ($this->dry) {
             return [0, ''];
         }
-        $proc = proc_open($cmd, [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, null, $env + ['PATH' => '/usr/local/hestia/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin', 'HOME' => $user ? "/home/$user" : '/root', 'GIT_TERMINAL_PROMPT' => '0', 'HESTIA' => $this->cfg['hestia']]);
+        $proc = proc_open($cmd, [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, null, $env + ['PATH' => '/usr/local/hestia/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin', 'HOME' => $user ? "/home/$user" : '/root', 'GIT_TERMINAL_PROMPT' => '0', 'HESTIA' => $this->cfg['hestia']]);
         if (!is_resource($proc)) {
             throw new RuntimeException('Impossibile eseguire: ' . $cmd[0]);
         }
+        if ($stdin !== null) {
+            fwrite($pipes[0], $stdin);
+        }
+        fclose($pipes[0]);
         $out = trim(stream_get_contents($pipes[1]) . stream_get_contents($pipes[2]));
         fclose($pipes[1]);
         fclose($pipes[2]);
@@ -211,16 +204,28 @@ final class Node
             return true;
         }
         foreach (scandir($dir) ?: [] as $f) {
-            if (!in_array($f, ['.', '..', 'index.html', 'robots.txt', '.well-known', 'favicon.ico'], true)) {
+            if (!in_array($f, ['.', '..'], true)) {
                 return false;
             }
         }
         return true;
     }
 
+    private function stack(string $key, string $default = ''): string
+    {
+        return (string)($this->cfg[$key] ?? $default);
+    }
+
+    public function names(string $domain, string $path): array
+    {
+        $label = substr(preg_replace('/[^a-z0-9]/', '', explode('.', $domain)[0]) ?: 'shop', 0, 10);
+        $slug = $label . '_' . substr(sha1($domain . '/' . $path), 0, 4);
+        return [$slug, 'as_' . $slug];
+    }
+
     public function installShop(array $p): array
     {
-        $this->validate($p, ['domain' => 'domain', 'hestia_user' => 'user', 'path' => 'path', 'repo' => 'repo', 'branch' => 'branch', 'theme' => 'theme', 'lang' => 'lang', 'hub_secret' => 'secret', 'url' => 'url']);
+        $this->validate($p, ['domain' => 'domain', 'path' => 'path', 'repo' => 'repo', 'branch' => 'branch', 'theme' => 'theme', 'lang' => 'lang', 'hub_secret' => 'secret', 'url' => 'url']);
         if (!filter_var($p['admin_email'] ?? '', FILTER_VALIDATE_EMAIL) || !isset($p['admin_password']) || strlen((string)$p['admin_password']) < 12 || !preg_match('/^[\w.~-]+$/D', (string)$p['admin_password'])) {
             throw new RuntimeException('Parametri amministratore non validi.');
         }
@@ -234,129 +239,199 @@ final class Node
             }
         }
         $this->redact = array_values(array_filter([(string)$p['admin_password'], (string)$p['hub_secret']]));
-        $user = $p['hestia_user'];
         $domain = $p['domain'];
         $path = $p['path'];
-        $edge = ($p['mode'] ?? 'direct') === 'edge';
-        $docroot = "/home/$user/web/$domain/public_html";
-        $target = $path === '' ? $docroot : "$docroot/$path";
+        [$slug, $user] = $this->names($domain, $path);
+        $base = $this->stack('base', '/var/www/alienshop');
+        $home = "$base/shops/$slug";
+        $app = "$home/app";
+        $phpv = $this->stack('php');
+        $listen = $this->stack('listen');
+        $nginxUser = $this->stack('nginx_user', 'www-data');
+        if (!$this->dry && (!preg_match('/^\d\.\d$/D', $phpv) || !preg_match('/^(\d{1,3}\.){3}\d{1,3}$/D', $listen))) {
+            throw new RuntimeException('Il server non è preparato: esegui prima node/stack.sh.');
+        }
         $name = (string)($p['store_name'] ?? $domain);
         $name = trim(preg_replace('/[^\p{L}\p{N} .,&\'-]/u', '', $name) ?? '') ?: $domain;
+        $this->say("== Installazione di $domain" . ($path ? "/$path" : '') . " (utente $user)");
 
-        $this->say("== Installazione di $domain" . ($path ? "/$path" : '') . " ($user)");
-        if (!$this->dry) {
-            [$code] = $this->hestia('v-list-user', [$user], false);
-            if ($code !== 0) {
-                throw new RuntimeException("L'utente Hestia $user non esiste su questo server.");
-            }
-        }
-        [$exists] = $this->hestia('v-list-web-domain', [$user, $domain], false);
+        [$exists] = $this->sh(['id', '-u', $user], null, [], false);
         if ($exists !== 0 || $this->dry) {
-            $this->hestia('v-add-web-domain', [$user, $domain]);
+            $this->sh(['useradd', '--system', '--home-dir', $home, '--no-create-home', '--shell', '/usr/sbin/nologin', '--user-group', $user]);
         }
-        if (!$this->dry && !is_dir($docroot)) {
-            throw new RuntimeException("Cartella $docroot non trovata dopo la creazione del dominio.");
-        }
+        $this->sh(['usermod', '-aG', $user, $nginxUser]);
+        $this->sh(['install', '-d', '-o', $user, '-g', $user, '-m', '0750', $home, "$home/tmp"]);
 
-        $reuse = is_dir("$target/.git") && !is_file("$target/config/config.php");
-        if (!$reuse && !$this->emptyish($target)) {
-            throw new RuntimeException("La cartella $target contiene già dei file: non la sovrascrivo.");
+        $reuse = is_dir("$app/.git") && !is_file("$app/config/config.php");
+        if (!$reuse && !$this->emptyish($app)) {
+            throw new RuntimeException("La cartella $app contiene già dei file: non la sovrascrivo.");
         }
         if ($reuse) {
-            $this->sh(['git', '-C', $target, 'pull', '--ff-only'], $user);
+            $this->sh(['git', '-C', $app, 'pull', '--ff-only'], $user);
         } else {
-            if ($path === '') {
-                foreach (['index.html', 'robots.txt', 'favicon.ico'] as $f) {
-                    if (!$this->dry && is_file("$docroot/$f")) {
-                        unlink("$docroot/$f");
-                    }
-                }
-            }
-            $this->sh(['git', 'clone', '--depth', '1', '-b', $p['branch'], 'https://github.com/' . $p['repo'] . '.git', $target], $user);
+            $this->sh(['git', 'clone', '--depth', '1', '-b', $p['branch'], 'https://github.com/' . $p['repo'] . '.git', $app], $user);
         }
+        $this->write("$app/storage/install.key", bin2hex(random_bytes(16)), 0640, $user);
 
-        $this->write("$target/storage/install.key", bin2hex(random_bytes(16)), 0640, $user);
-        $slug = substr(preg_replace('/[^a-z0-9]/', '', explode('.', $domain)[0]) ?: 'shop', 0, 8) . substr(bin2hex(random_bytes(2)), 0, 3);
         $dbPass = bin2hex(random_bytes(12));
         $this->redact[] = $dbPass;
-        $this->hestia('v-add-database', [$user, $slug, $slug, $dbPass, 'mysql']);
-        $dbName = "{$user}_{$slug}";
+        $this->sh(['mysql', '--batch'], null, [], true, "CREATE DATABASE IF NOT EXISTS `$user` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;\n"
+            . "CREATE USER IF NOT EXISTS '$user'@'localhost' IDENTIFIED BY '$dbPass';\n"
+            . "ALTER USER '$user'@'localhost' IDENTIFIED BY '$dbPass';\n"
+            . "GRANT ALL PRIVILEGES ON `$user`.* TO '$user'@'localhost';\nFLUSH PRIVILEGES;\n");
 
-        $conf = "/home/$user/conf/web/$domain";
-        $uploadsBlock = "location ^~ " . ($path === '' ? '' : "/$path") . "/uploads/ {\n    location ~ \\.(php|phtml|phar)\$ { return 403; }\n}\n";
-        if ($path === '') {
-            if (empty($p['skip_template'])) {
-                $this->hestia('v-change-web-domain-tpl', [$user, $domain, 'alienshop']);
+        $written = [];
+        try {
+            $pool = "/etc/php/$phpv/fpm/pool.d/$user.conf";
+            $this->write($pool, $this->poolConfig($user, $home, $nginxUser));
+            $written[] = $pool;
+            $this->sh(["php-fpm$phpv", '-t']);
+            $this->sh(['systemctl', 'reload', "php$phpv-fpm"]);
+
+            $conf = "/etc/nginx/conf.d/as-$domain.conf";
+            $inc = "/etc/nginx/alienshop.d/$domain";
+            if ($this->dry || !is_file($conf)) {
+                $this->write($conf, $this->vhost($domain, $listen));
+                $written[] = $conf;
             }
-            $this->write("$conf/nginx.conf_alienshop", $uploadsBlock);
-            $this->write("$conf/nginx.ssl.conf_alienshop", $uploadsBlock);
-        } else {
-            $block = $this->subfolderBlock($user, $domain, $path, $target);
-            $this->write("$conf/nginx.conf_alienshop_$path", $block);
-            $this->write("$conf/nginx.ssl.conf_alienshop_$path", $block);
+            $this->sh(['install', '-d', '-m', '0755', $inc]);
+            if ($this->dry || !is_file("$inc/suspend.inc")) {
+                $this->write("$inc/suspend.inc", "# attivo\n");
+            }
+            $loc = $path === '' ? "$inc/00-root.loc" : "$inc/10-$path.loc";
+            $this->write($loc, $path === '' ? $this->rootLocation($app, $user) : $this->subLocation($app, $user, $path));
+            $written[] = $loc;
+            if ($path === '') {
+                $this->sh(['rm', '-f', "$inc/99-default.loc"]);
+            } elseif ($this->dry || !is_file("$inc/00-root.loc")) {
+                $site = "$base/sites/$domain";
+                $this->sh(['install', '-d', '-m', '0755', $site]);
+                if ($this->dry || !is_file("$site/index.html")) {
+                    $this->write("$site/index.html", "<!doctype html><meta charset=\"utf-8\"><title>$domain</title>\n");
+                }
+                $this->write("$inc/99-default.loc", "root $site;\nindex index.html;\nlocation / { try_files \$uri \$uri/ =404; }\n");
+            }
+            $this->sh(['nginx', '-t']);
+            $this->sh(['systemctl', 'reload', 'nginx']);
+        } catch (Throwable $e) {
+            foreach ($written as $f) {
+                if (!$this->dry) {
+                    @unlink($f);
+                }
+            }
+            throw $e;
         }
-        if (!$edge) {
-            $this->hestia('v-add-letsencrypt-domain', [$user, $domain], false);
-            $this->hestia('v-add-web-domain-ssl-force', [$user, $domain], false);
-        }
-        $this->hestia('v-restart-web', [], false);
 
         $env = ['ALIEN_ADMIN_PASSWORD' => $p['admin_password'], 'ALIEN_DB_PASS' => $dbPass, 'ALIEN_HUB_SECRET' => $p['hub_secret'], 'ALIEN_HUB_URL' => $p['hub_url']];
-        $args = [$target . '/bin/console', 'install', '--url=' . $p['url'], '--store-name=' . $name, '--admin-email=' . $p['admin_email'],
-            '--db=mysql', '--db-host=localhost', '--db-name=' . $dbName, '--db-user=' . $dbName, '--theme=' . $p['theme'], '--lang=' . $p['lang'], '--demo=' . (int)!empty($p['demo'])];
+        $args = ["$app/bin/console", 'install', '--url=' . $p['url'], '--store-name=' . $name, '--admin-email=' . $p['admin_email'],
+            '--db=mysql', '--db-host=localhost', '--db-name=' . $user, '--db-user=' . $user, '--theme=' . $p['theme'], '--lang=' . $p['lang'], '--demo=' . (int)!empty($p['demo'])];
         if ($proxies) {
             $args[] = '--trusted-proxies=' . implode(',', $proxies);
         }
         $this->sh(['php', ...$args], $user, $env);
-        $this->hestia('v-add-cron-job', [$user, '*', '*', '*', '*', '*', "php $target/bin/console cron:run"], false);
+
+        [, $sha] = $this->sh(['git', '-C', $app, 'rev-parse', 'HEAD'], $user, [], false);
+        $sha = preg_match('/^[0-9a-f]{40}$/D', (string)$sha) ? (string)$sha : '';
+        $this->write("$app/storage/update.json", json_encode(['sha' => $sha, 'files' => []]), 0640, $user);
+        $this->sh(['rm', '-rf', "$app/.git"]);
+        $this->write("/etc/cron.d/$user", "* * * * * $user /usr/bin/php $app/bin/console cron:run >/dev/null 2>&1\n");
         $this->say('== Installazione completata');
-        return ['url' => $p['url'], 'database' => $dbName];
+        return ['url' => $p['url'], 'database' => $user, 'user' => $user];
     }
 
-    public function subfolderBlock(string $user, string $domain, string $path, string $target): string
+    public function poolConfig(string $user, string $home, string $nginxUser): string
     {
-        $sock = $this->phpSocket($user, $domain);
+        return <<<POOL
+[$user]
+user = $user
+group = $user
+listen = /run/php/$user.sock
+listen.owner = $nginxUser
+listen.group = $nginxUser
+listen.mode = 0660
+pm = ondemand
+pm.max_children = 8
+pm.process_idle_timeout = 30s
+pm.max_requests = 500
+php_admin_value[open_basedir] = $home:/tmp:/usr/share/zoneinfo
+php_admin_value[upload_tmp_dir] = $home/tmp
+php_admin_value[sys_temp_dir] = $home/tmp
+php_admin_value[upload_max_filesize] = 64M
+php_admin_value[post_max_size] = 64M
+php_admin_value[max_execution_time] = 120
+php_admin_value[memory_limit] = 256M
+php_admin_value[expose_php] = off
+php_admin_value[disable_functions] = exec,passthru,shell_exec,system,proc_open,popen,pcntl_exec,pcntl_fork,dl
+php_admin_flag[allow_url_include] = off
+
+POOL;
+    }
+
+    public function vhost(string $domain, string $listen): string
+    {
         return <<<NGX
-location ^~ /$path/ {
-    alias $target/public/;
-    try_files \$uri @alienshop_$path;
-    location ~ \\.(php|phtml|phar)\$ { return 404; }
-}
-location = /$path { return 301 /$path/; }
-location @alienshop_$path {
-    include /etc/nginx/fastcgi_params;
-    fastcgi_pass $sock;
-    fastcgi_param SCRIPT_FILENAME $target/public/index.php;
-    fastcgi_param SCRIPT_NAME /$path/index.php;
-    fastcgi_param REQUEST_URI \$request_uri;
+server {
+    listen $listen:80;
+    server_name $domain www.$domain;
+    server_tokens off;
+    client_max_body_size 64m;
+    include /etc/nginx/alienshop.d/$domain/suspend.inc;
+    include /etc/nginx/alienshop.d/$domain/*.loc;
 }
 
 NGX;
     }
 
-    private function phpSocket(string $user, string $domain): string
+    public function rootLocation(string $app, string $user): string
     {
-        foreach (glob('/run/php/php*-fpm-' . $domain . '.sock') ?: [] as $s) {
-            return 'unix:' . $s;
-        }
-        $pools = glob('/etc/php/*/fpm/pool.d/' . $domain . '.conf') ?: [];
-        foreach ($pools as $f) {
-            if (preg_match('/^listen\s*=\s*(\S+)/m', (string)file_get_contents($f), $m)) {
-                return 'unix:' . $m[1];
-            }
-        }
-        return 'unix:/run/php/php-fpm-' . $domain . '.sock';
+        return <<<NGX
+root $app/public;
+index index.php;
+location ~ /\\.(?!well-known/) { deny all; return 404; }
+location ^~ /uploads/ {
+    location ~ \\.(php|phtml|phar)\$ { return 403; }
+    try_files \$uri =404;
+}
+location ~* \\.(css|js|webp|jpg|jpeg|png|gif|svg|woff2|ico)\$ {
+    expires 1y;
+    add_header Cache-Control "public, immutable";
+    try_files \$uri =404;
+}
+location / { try_files \$uri /index.php?\$query_string; }
+location ~ \\.php\$ {
+    include /etc/nginx/fastcgi_params;
+    fastcgi_param SCRIPT_FILENAME $app/public/index.php;
+    fastcgi_pass unix:/run/php/$user.sock;
+    fastcgi_read_timeout 700s;
+}
+
+NGX;
+    }
+
+    public function subLocation(string $app, string $user, string $path): string
+    {
+        return <<<NGX
+location ^~ /$path/ {
+    alias $app/public/;
+    try_files \$uri @as_$user;
+    location ~ \\.(php|phtml|phar)\$ { return 404; }
+}
+location = /$path { try_files /__none @as_$user; }
+location @as_$user {
+    include /etc/nginx/fastcgi_params;
+    fastcgi_pass unix:/run/php/$user.sock;
+    fastcgi_param SCRIPT_FILENAME $app/public/index.php;
+    fastcgi_param SCRIPT_NAME /$path/index.php;
+    fastcgi_param REQUEST_URI \$request_uri;
+    fastcgi_read_timeout 700s;
+}
+
+NGX;
     }
 
     public function addEdge(array $p): array
     {
         $this->validate($p, ['domain' => 'domain', 'hestia_user' => 'user', 'upstream' => 'upstream']);
-        $originHost = (string)($p['origin_host'] ?? '');
-        $relaySecret = (string)($p['relay_secret'] ?? '');
-        if ($originHost !== '') {
-            $this->validate(['origin_host' => $originHost, 'relay_secret' => $relaySecret], ['origin_host' => 'host', 'relay_secret' => 'secret']);
-            $this->redact[] = $relaySecret;
-        }
         $user = $p['hestia_user'];
         $domain = $p['domain'];
         $this->say("== Pubblicazione di $domain tramite frontend");
@@ -368,7 +443,7 @@ NGX;
         if (!$this->dry) {
             @mkdir('/var/cache/nginx/alienshop', 0755, true);
         }
-        $this->write("/home/$user/conf/web/$domain/alienshop_edge.inc", $this->edgeConfig($p['upstream'], $originHost, $relaySecret), 0600);
+        $this->write("/home/$user/conf/web/$domain/alienshop_edge.inc", $this->edgeConfig($p['upstream']), 0600);
         $this->hestia('v-change-web-domain-tpl', [$user, $domain, 'alienshop-edge']);
         $this->hestia('v-add-letsencrypt-domain', [$user, $domain], false);
         $this->hestia('v-add-web-domain-ssl-force', [$user, $domain], false);
@@ -377,13 +452,12 @@ NGX;
         return ['upstream' => $p['upstream']];
     }
 
-    public function edgeConfig(string $upstream, string $originHost = '', string $relaySecret = ''): string
+    public function edgeConfig(string $upstream): string
     {
-        $tunnel = $originHost !== '' ? "    proxy_ssl_server_name on;\n    proxy_ssl_name $originHost;\n    proxy_set_header Host $originHost;\n    proxy_set_header X-Alien-Host \$host;\n    proxy_set_header X-Alien-Relay $relaySecret;" : '    proxy_set_header Host $host;';
         $common = <<<NGX
     proxy_pass $upstream;
     proxy_http_version 1.1;
-$tunnel
+    proxy_set_header Host \$host;
     proxy_set_header X-Real-IP \$remote_addr;
     proxy_set_header X-Forwarded-For \$remote_addr;
     proxy_set_header X-Forwarded-Proto \$scheme;
@@ -415,8 +489,11 @@ NGX;
 
     private function suspend(array $p, bool $on): array
     {
-        $this->validate($p, ['domain' => 'domain', 'hestia_user' => 'user']);
-        $this->hestia($on ? 'v-suspend-web-domain' : 'v-unsuspend-web-domain', [$p['hestia_user'], $p['domain']]);
+        $this->validate($p, ['domain' => 'domain']);
+        $domain = $p['domain'];
+        $this->write("/etc/nginx/alienshop.d/$domain/suspend.inc", $on ? "return 503;\n" : "# attivo\n");
+        $this->sh(['nginx', '-t']);
+        $this->sh(['systemctl', 'reload', 'nginx']);
         return [];
     }
 
@@ -434,18 +511,6 @@ if (PHP_SAPI === 'cli' && isset($argv[0]) && realpath($argv[0]) === realpath(__F
     switch ($cmd) {
         case 'run':
             exit($node->run());
-        case 'claim':
-            if (!isset($argv[2], $argv[3])) {
-                fwrite(STDERR, "Uso: alienshop-node claim UTENTE DOMINIO [--path=cartella] [--skip-template]\n");
-                exit(1);
-            }
-            $path = '';
-            foreach (array_slice($argv, 4) as $a) {
-                if (str_starts_with($a, '--path=')) {
-                    $path = substr($a, 7);
-                }
-            }
-            exit($node->claim($argv[2], $argv[3], $path, in_array('--skip-template', $argv, true)));
         case 'info':
             echo json_encode($node->info(), JSON_PRETTY_PRINT) . "\n";
             exit(0);
@@ -453,7 +518,7 @@ if (PHP_SAPI === 'cli' && isset($argv[0]) && realpath($argv[0]) === realpath(__F
             echo AGENT_VERSION . "\n";
             exit(0);
         default:
-            fwrite(STDERR, "Comandi: run | claim UTENTE DOMINIO | info | version\n");
+            fwrite(STDERR, "Comandi: run | info | version\n");
             exit(1);
     }
 }

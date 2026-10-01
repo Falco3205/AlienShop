@@ -9,7 +9,7 @@ final class Nodes
 {
     public const ROLES = ['backend' => 'Backend (ospita i negozi)', 'edge' => 'Frontend (pubblica i negozi)'];
 
-    public static function create(string $name, string $role, string $address, string $upstream, string $hestiaUser, string $trusted = '', string $tunnelHost = ''): array
+    public static function create(string $name, string $role, string $address, string $upstream, string $hestiaUser, string $trusted = ''): array
     {
         $errors = [];
         $name = trim($name);
@@ -20,14 +20,8 @@ final class Nodes
         if (!isset(self::ROLES[$role])) {
             $errors[] = 'Ruolo non valido.';
         }
-        $tunnelHost = mb_strtolower(trim($tunnelHost));
-        if ($role === 'backend' && $tunnelHost !== '') {
-            if (!preg_match('/^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,24}$/D', $tunnelHost)) {
-                $errors[] = 'Hostname del tunnel non valido (es. backend-origin.tuodominio.it).';
-            }
-            $upstream = 'https://' . $tunnelHost;
-        } elseif ($role === 'backend' && !preg_match('#^https?://[\w.\-\[\]:]+$#D', $upstream)) {
-            $errors[] = 'Indirizzo del backend raggiungibile dal frontend non valido (es. http://10.0.0.2:80), oppure indica l\'hostname del tunnel.';
+        if ($role === 'backend' && !preg_match('#^https?://[\w.\-\[\]:]+$#D', $upstream)) {
+            $errors[] = 'Indirizzo del backend visto dal frontend non valido (es. http://100.64.0.2:80, con Tailscale: tailscale ip -4).';
         }
         $trusted = trim($trusted);
         foreach (array_filter(array_map('trim', explode(',', $trusted))) as $range) {
@@ -36,8 +30,8 @@ final class Nodes
                 break;
             }
         }
-        if (!preg_match('/^[a-z][a-z0-9_-]{0,31}$/D', $hestiaUser)) {
-            $errors[] = 'Utente Hestia non valido.';
+        if ($role === 'edge' && !preg_match('/^[a-z][a-z0-9_-]{0,31}$/D', $hestiaUser)) {
+            $errors[] = 'Per il frontend serve l\'utente Hestia che ospita i domini.';
         }
         if ($errors) {
             return [null, null, $errors];
@@ -45,7 +39,7 @@ final class Nodes
         $token = bin2hex(random_bytes(24));
         $id = DB::insert('nodes', [
             'name' => $name, 'role' => $role, 'token_hash' => hash('sha256', $token), 'address' => trim($address),
-            'upstream' => $role === 'backend' ? $upstream : '', 'trusted' => $role === 'backend' ? $trusted : '', 'tunnel_host' => $role === 'backend' ? $tunnelHost : '', 'relay_secret' => $role === 'backend' && $tunnelHost !== '' ? bin2hex(random_bytes(16)) : '', 'hestia_user' => $hestiaUser, 'created_at' => now(),
+            'upstream' => $role === 'backend' ? $upstream : '', 'trusted' => $role === 'backend' ? $trusted : '', 'hestia_user' => $role === 'edge' ? $hestiaUser : '', 'created_at' => now(),
         ]);
         return [$id, $token, []];
     }
@@ -61,11 +55,6 @@ final class Nodes
     {
         $host = parse_url((string)$node['upstream'], PHP_URL_HOST);
         return is_string($host) && filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== false && \Alien\Core\Request::inRanges($host, ['100.64.0.0/10']);
-    }
-
-    public static function forwarded(array $node): bool
-    {
-        return $node['role'] === 'backend' && ($node['tunnel_host'] !== '' || self::tailnet($node));
     }
 
     public static function find(int $id): ?array

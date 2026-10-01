@@ -8,7 +8,7 @@ use Alien\Core\Secret;
 
 final class Jobs
 {
-    private const SECRET_KEYS = ['admin_password', 'hub_secret', 'relay_secret'];
+    private const SECRET_KEYS = ['admin_password', 'hub_secret'];
 
     public const TYPES = ['install_shop' => 'Installa negozio', 'add_edge' => 'Pubblica sul frontend', 'suspend_shop' => 'Sospendi negozio', 'unsuspend_shop' => 'Riattiva negozio', 'node_update' => 'Aggiorna agente'];
 

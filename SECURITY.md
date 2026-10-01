@@ -32,10 +32,10 @@ Questo documento dice cosa è stato controllato, cosa fa il software per protegg
 - L'hub **non conserva** password o chiavi di Hestia e non entra in SSH: sono gli agenti sui server a contattare l'hub.
 - Richieste hub → negozio firmate con HMAC-SHA256 con nonce monouso, timestamp e segreto per negozio (anti replay); token per server (solo l'hash è nel database, 192 bit); limiti sui tentativi falliti.
 - Segreti dei lavori (password iniziali, segreti) cifrati nel database dell'hub e cancellati a lavoro concluso; password e segreti oscurati nei registri dell'agente.
-- L'agente esegue solo operazioni fisse e valida ogni parametro (dominio, utente Hestia ammesso, cartella, repository, URL…) con espressioni ancorate; le regole a stringa non lasciano passare ritorni a capo.
+- L'agente esegue solo operazioni fisse e valida ogni parametro (dominio, cartella, repository, URL…; sul frontend anche l'utente Hestia ammesso) con espressioni ancorate; le regole a stringa non lasciano passare ritorni a capo.
 - Accesso a un negozio dall'hub con token monouso da 90 secondi.
-- Collegamento tra le VPS con **Tailscale** (WireGuard, ACL che consentono al frontend solo la porta 80 del backend); il backend non ha porte pubbliche e l'hub è raggiungibile solo dalla tailnet. L'hub interroga i negozi direttamente dalla tailnet, senza passare da Cloudflare.
-- Tunnel Cloudflare (alternativa, [docs/TUNNEL-CLOUDFLARE.md](docs/TUNNEL-CLOUDFLARE.md)): il frontend entra nel backend solo con un **segreto del relay** (intestazione `X-Alien-Relay`, generato dall'hub, mai nei registri); chi scopre l'hostname del tunnel senza il segreto riceve 403 e non può falsificare l'IP dei visitatori. Con `--cloudflare` l'IP vero arriva da `CF-Connecting-IP`, accettato solo se la richiesta viene da un intervallo IP di Cloudflare (aggiornato ogni settimana).
+- Collegamento tra le VPS con **Tailscale** (WireGuard, ACL che consentono al frontend solo la porta 80 del backend). Il **backend non ha Hestia né porte pubbliche**: Nginx ascolta solo sull'IP Tailscale, gli host sconosciuti ricevono 444, MariaDB è solo locale. L'hub è raggiungibile solo dalla tailnet e interroga i negozi direttamente da lì, senza passare da Cloudflare.
+- **Isolamento per negozio** sul backend: utente di sistema, database e pool PHP-FPM propri; `open_basedir` limitato alla cartella del negozio e funzioni di esecuzione (`exec`, `system`, `proc_open`…) disattivate nel web: una falla in un negozio non arriva agli altri né alla macchina.
 - Wizard di installazione protetto da una chiave (`storage/install.key`) quando l'installazione è guidata dall'hub.
 
 ## Prima di andare online (checklist)
@@ -47,7 +47,7 @@ Questo documento dice cosa è stato controllato, cosa fa il software per protegg
 5. **Hub solo in tailnet** (o almeno su un sottodominio dedicato) (es. `hub.tuodominio.it`, `--root` nello script di installazione). Se sta sotto un percorso di un sito con altro software (WordPress…), una falla in quel sito, che ha la stessa origine, può agire sul pannello.
 6. **GitHub**: attiva la 2FA sul tuo account, proteggi il branch `main` (richiedi PR o almeno blocca il force-push) e tieni **spento l'aggiornamento automatico** mentre sviluppi: chi può scrivere su `main` può eseguire codice su tutti i negozi.
 7. Backup regolari fuori dal server e **PHP aggiornato** (8.2+).
-8. Con frontend/tunnel imposta correttamente i **proxy fidati** (*IP da cui il backend vede arrivare il frontend*): senza, tutti i visitatori sembrano avere lo stesso IP e i limiti di accesso colpiscono tutti. Se Cloudflare sta davanti al frontend, configura `set_real_ip_from` con i suoi intervalli.
+8. Con frontend e backend separati i **proxy fidati** (*IP da cui il backend vede arrivare il frontend*) devono essere corretti (con Tailscale lo imposta il pannello): senza, tutti i visitatori sembrano avere lo stesso IP e i limiti di accesso colpiscono tutti. Se Cloudflare sta davanti al frontend usa `--cloudflare` nel comando di collegamento del frontend (`set_real_ip_from` con i suoi intervalli).
 9. Permessi: `config/config.php` e `storage/` leggibili solo dall'utente PHP (`chmod 640` / `750`).
 10. Se aggiungi script di terzi (pixel, chat) autorizza il dominio in *Admin → Sicurezza* (CSP) invece di disattivarla.
 
@@ -56,7 +56,7 @@ Questo documento dice cosa è stato controllato, cosa fa il software per protegg
 - **CSP del negozio** ammette script inline (le pagine sono in cache e i codici di terzi inseriti dall'admin sono inline): riduce i danni ma non è una difesa completa contro l'XSS; per questo l'output è sempre escapato e l'HTML sanitizzato alla scrittura.
 - **Il chi controlla l'hub o l'account GitHub controlla i server**: gli agenti, che girano come root, eseguono ciò che l'hub chiede e i negozi scaricano il codice da GitHub.
 - **Tempo di installazione**: tra il clone e l'installazione di un nuovo negozio (pochi secondi) il wizard è protetto dalla chiave di installazione, ma i file del negozio sono già sul server.
-- I comandi `v-*` di Hestia, i template Nginx e il tunnel non sono stati provati su un server reale; i pagamenti, la posta e il Sistema di Interscambio non sono stati provati con servizi reali.
+- I comandi `v-*` di Hestia (frontend), la configurazione di Nginx/PHP-FPM/MariaDB sul backend, Tailscale, UFW e Cloudflare non sono stati provati su un server reale; i pagamenti, la posta e il Sistema di Interscambio non sono stati provati con servizi reali.
 - Non c'è un WAF, né rilevamento di intrusioni: affianca Fail2ban/CrowdSec e, se puoi, Cloudflare.
 
 ## Segnalare una vulnerabilità

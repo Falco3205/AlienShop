@@ -115,6 +115,5 @@ final class App
 
         $add('POST', '/api/node/poll', ApiController::class, 'poll', true);
         $add('POST', '/api/node/jobs/{id}', ApiController::class, 'result', true);
-        $add('POST', '/api/node/claim', ApiController::class, 'claim', true);
     }
 }

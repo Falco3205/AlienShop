@@ -22,123 +22,119 @@ function ok(bool $c, string $m = ''): void
         throw new RuntimeException($m ?: 'condizione falsa');
     }
 }
-function throwsMsg(callable $fn, string $needle): void
-{
-    try {
-        $fn();
-    } catch (RuntimeException $e) {
-        ok(str_contains($e->getMessage(), $needle), 'messaggio: ' . $e->getMessage());
-        return;
-    }
-    throw new RuntimeException('doveva fallire: ' . $needle);
-}
 
 $base = [
-    'shop_id' => 1, 'domain' => 'cliente.it', 'path' => '', 'hestia_user' => 'falco3205', 'mode' => 'direct', 'url' => 'https://cliente.it',
+    'shop_id' => 1, 'domain' => 'cliente.it', 'path' => '', 'mode' => 'direct', 'url' => 'https://cliente.it',
     'repo' => 'Falco3205/AlienShop', 'branch' => 'main', 'store_name' => "Rossi & Figli's", 'admin_email' => 'a@cliente.it', 'admin_password' => 'Abcdef1234567890',
-    'theme' => 'aurora', 'lang' => 'it', 'demo' => 0, 'hub_url' => 'https://falconefabio.it/alienshop', 'hub_secret' => str_repeat('ab', 24), 'trusted_proxies' => [],
+    'theme' => 'aurora', 'lang' => 'it', 'demo' => 0, 'hub_url' => 'http://hub.falconefabio.it', 'hub_secret' => str_repeat('ab', 24), 'trusted_proxies' => ['100.64.0.0/10'],
 ];
-$node = fn() => new Node(['hub' => 'https://hub.test', 'token' => 'x', 'user' => 'falco3205', 'users' => ['falco3205']], true);
+$backend = fn() => new Node(['hub' => 'http://hub.test', 'token' => 'x', 'role' => 'backend', 'php' => '8.3', 'listen' => '100.101.102.103', 'nginx_user' => 'www-data', 'base' => '/var/www/alienshop'], true);
+$edge = fn() => new Node(['hub' => 'http://hub.test', 'token' => 'x', 'role' => 'edge', 'user' => 'falco3205', 'users' => ['falco3205']], true);
 
 fwrite(STDOUT, "Agente server\n");
-t('installazione nella cartella principale: sequenza Hestia corretta', function () use ($base, $node) {
-    $n = $node();
+t('backend senza Hestia: utente, database, pool PHP, Nginx, installazione, cron', function () use ($base, $backend) {
+    $n = $backend();
     $r = $n->installShop($base);
     $log = implode("\n", $n->log);
-    foreach (['v-add-web-domain falco3205 cliente.it', 'git clone --depth 1 -b main https://github.com/Falco3205/AlienShop.git /home/falco3205/web/cliente.it/public_html', 'v-add-database falco3205', 'v-change-web-domain-tpl falco3205 cliente.it alienshop', 'v-add-letsencrypt-domain falco3205 cliente.it', 'bin/console install --url=https://cliente.it', '--db=mysql', 'v-add-cron-job falco3205'] as $needle) {
+    [$slug, $user] = $n->names('cliente.it', '');
+    foreach (["useradd --system --home-dir /var/www/alienshop/shops/$slug", "usermod -aG $user www-data", 'git clone --depth 1 -b main https://github.com/Falco3205/AlienShop.git ' . "/var/www/alienshop/shops/$slug/app",
+        'mysql --batch < (SQL)', "/etc/php/8.3/fpm/pool.d/$user.conf", 'php-fpm8.3 -t', 'systemctl reload php8.3-fpm', '/etc/nginx/conf.d/as-cliente.it.conf', '00-root.loc', 'nginx -t', 'systemctl reload nginx',
+        'bin/console install --url=https://cliente.it', '--db=mysql', "--db-name=$user", '--trusted-proxies=100.64.0.0/10', "/etc/cron.d/$user", "rm -rf /var/www/alienshop/shops/$slug/app/.git"] as $needle) {
         ok(str_contains($log, $needle), "manca: $needle");
     }
-    ok(!str_contains($log, 'Abcdef1234567890'), 'la password non deve comparire nel log');
-    ok(!str_contains($log, str_repeat('ab', 24)), 'il secret non deve comparire nel log');
-    ok(str_contains($log, "'--store-name=Rossi & Figli'\\''s'") || str_contains($log, '--store-name='), 'nome negozio passato come argomento singolo');
-    ok($r['url'] === 'https://cliente.it');
+    ok(!str_contains($log, 'v-add') && !str_contains($log, 'hestia'), 'nessun comando di Hestia sul backend');
+    ok(!str_contains($log, 'Abcdef1234567890') && !str_contains($log, str_repeat('ab', 24)), 'password e segreti non nel registro');
+    ok(!str_contains($log, 'IDENTIFIED BY'), 'la password del database non passa nel registro');
+    ok(strpos($log, 'storage/install.key') < strpos($log, 'bin/console install'), 'chiave di installazione prima dell\'installazione');
+    ok(strpos($log, 'git clone') < strpos($log, 'rm -rf'), 'il clone precede la rimozione di .git');
+    ok($r['url'] === 'https://cliente.it' && $r['user'] === $user);
 });
-t('installazione in sottocartella: nessun cambio di template, blocco Nginx dedicato', function () use ($base, $node) {
-    $n = $node();
+t('nomi: utente e database unici per dominio+cartella, entro i limiti di Linux', function () use ($backend) {
+    $n = $backend();
+    [, $a] = $n->names('cliente.it', '');
+    [, $b] = $n->names('cliente.it', 'negozio');
+    [, $c] = $n->names('un-dominio-molto-lungo-davvero.example.com', '');
+    ok($a !== $b, 'stesso dominio, cartelle diverse');
+    ok(strlen($a) <= 32 && strlen($c) <= 32 && preg_match('/^as_[a-z0-9_]+$/', $c) === 1, $c);
+});
+t('sottocartella: percorso dedicato, pagina segnaposto, nessuna radice', function () use ($base, $backend) {
+    $n = $backend();
     $n->installShop(['path' => 'negozio', 'url' => 'https://cliente.it/negozio'] + $base);
     $log = implode("\n", $n->log);
-    ok(!str_contains($log, 'v-change-web-domain-tpl'), 'il template del dominio non deve cambiare');
-    ok(str_contains($log, 'public_html/negozio'), 'cartella di destinazione');
-    ok(str_contains($log, 'nginx.conf_alienshop_negozio'));
-    $b = $n->subfolderBlock('falco3205', 'cliente.it', 'negozio', '/home/falco3205/web/cliente.it/public_html/negozio');
-    ok(str_contains($b, 'location ^~ /negozio/') && str_contains($b, 'alias /home/falco3205/web/cliente.it/public_html/negozio/public/;') && str_contains($b, 'fastcgi_param SCRIPT_NAME /negozio/index.php;'));
-    ok(str_contains($b, "location ~ \\.(php|phtml|phar)\$ { return 404; }"), 'niente PHP diretto');
+    ok(str_contains($log, '10-negozio.loc') && str_contains($log, '99-default.loc') && !str_contains($log, '00-root.loc'));
+    [, $user] = $n->names('cliente.it', 'negozio');
+    $b = $n->subLocation("/var/www/alienshop/shops/x/app", $user, 'negozio');
+    ok(str_contains($b, 'location ^~ /negozio/') && str_contains($b, 'alias /var/www/alienshop/shops/x/app/public/;') && str_contains($b, 'fastcgi_param SCRIPT_NAME /negozio/index.php;') && str_contains($b, "location ~ \\.(php|phtml|phar)\$ { return 404; }"));
 });
-t('modalità frontend: niente Let\'s Encrypt sul backend e proxy fidati passati al negozio', function () use ($base, $node) {
-    $n = $node();
-    $n->installShop(['mode' => 'edge', 'trusted_proxies' => ['203.0.113.1']] + $base);
-    $log = implode("\n", $n->log);
-    ok(!str_contains($log, 'v-add-letsencrypt-domain'));
-    ok(str_contains($log, '--trusted-proxies=203.0.113.1'));
+t('radice dopo una sottocartella: il segnaposto viene tolto', function () use ($base, $backend) {
+    $n = $backend();
+    $n->installShop($base);
+    ok(str_contains(implode("\n", $n->log), 'rm -f /etc/nginx/alienshop.d/cliente.it/99-default.loc'));
 });
-t('claim da Hestia: salta il cambio di template', function () use ($base, $node) {
-    $n = $node();
-    $n->installShop(['skip_template' => true] + $base);
-    ok(!str_contains(implode("\n", $n->log), 'v-change-web-domain-tpl'));
+t('isolamento: pool PHP per negozio, open_basedir, funzioni di sistema disattivate, Nginx solo su tailnet', function () use ($backend) {
+    $n = $backend();
+    $pool = $n->poolConfig('as_x_1234', '/var/www/alienshop/shops/x_1234', 'www-data');
+    foreach (['user = as_x_1234', 'listen = /run/php/as_x_1234.sock', 'listen.mode = 0660', 'open_basedir] = /var/www/alienshop/shops/x_1234:/tmp', 'disable_functions] = exec,passthru,shell_exec,system,proc_open,popen', 'expose_php] = off', 'allow_url_include] = off'] as $needle) {
+        ok(str_contains($pool, $needle), $needle);
+    }
+    $v = $n->vhost('cliente.it', '100.101.102.103');
+    ok(str_contains($v, 'listen 100.101.102.103:80;') && str_contains($v, 'server_name cliente.it www.cliente.it;') && str_contains($v, 'suspend.inc') && str_contains($v, 'server_tokens off;'));
+    $r = $n->rootLocation('/var/www/alienshop/shops/x/app', 'as_x');
+    ok(str_contains($r, "location ^~ /uploads/") && str_contains($r, "return 403;") && str_contains($r, 'deny all') && str_contains($r, 'root /var/www/alienshop/shops/x/app/public;'));
+    ok(!str_contains($r, 'fastcgi_param SCRIPT_FILENAME $document_root'), 'il front controller è fisso');
 });
-t('frontend: configurazione proxy, cache e certificato', function () use ($node) {
-    $n = $node();
-    $n->addEdge(['domain' => 'cliente.it', 'hestia_user' => 'falco3205', 'upstream' => 'http://10.0.0.2:80']);
+t('sospensione e riattivazione', function () use ($backend) {
+    $n = $backend();
+    $n->execute(1, 'suspend_shop', ['domain' => 'cliente.it']);
+    ok(str_contains(implode("\n", $n->log), 'suspend.inc') && str_contains(implode("\n", $n->log), 'nginx -t'));
+});
+t('frontend (Hestia): proxy, cache, certificato; nessun tunnel', function () use ($edge) {
+    $n = $edge();
+    $n->addEdge(['domain' => 'cliente.it', 'hestia_user' => 'falco3205', 'upstream' => 'http://100.101.102.103:80']);
     $log = implode("\n", $n->log);
     foreach (['alienshop-cache.conf', 'alienshop_edge.inc', 'v-change-web-domain-tpl falco3205 cliente.it alienshop-edge', 'v-add-letsencrypt-domain falco3205 cliente.it'] as $needle) {
         ok(str_contains($log, $needle), "manca: $needle");
     }
-    $c = $n->edgeConfig('http://10.0.0.2:80');
-    ok(substr_count($c, 'proxy_pass http://10.0.0.2:80;') === 2);
-    ok(str_contains($c, 'proxy_cache_bypass $cookie_as_admin;') && str_contains($c, 'proxy_cache_use_stale') && str_contains($c, 'X-Forwarded-Proto $scheme'));
-});
-t('frontend con tunnel Cloudflare: hostname del tunnel, segreto del relay, IP reale', function () use ($node) {
-    $secret = str_repeat('ab', 16);
-    $n = $node();
-    $n->addEdge(['domain' => 'cliente.it', 'hestia_user' => 'falco3205', 'upstream' => 'https://backend-origin.falconefabio.it', 'origin_host' => 'backend-origin.falconefabio.it', 'relay_secret' => $secret]);
-    $log = implode("\n", $n->log);
-    ok(!str_contains($log, $secret), 'il segreto non deve comparire nel registro');
-    $c = $n->edgeConfig('https://backend-origin.falconefabio.it', 'backend-origin.falconefabio.it', $secret);
-    foreach (['proxy_ssl_server_name on;', 'proxy_ssl_name backend-origin.falconefabio.it;', 'proxy_set_header Host backend-origin.falconefabio.it;', 'proxy_set_header X-Alien-Host $host;', 'proxy_set_header X-Alien-Relay ' . $secret . ';', 'proxy_set_header X-Forwarded-For $remote_addr;'] as $needle) {
-        ok(substr_count($c, $needle) === 2, "manca: $needle");
+    $c = $n->edgeConfig('http://100.101.102.103:80');
+    ok(substr_count($c, 'proxy_pass http://100.101.102.103:80;') === 2 && str_contains($c, 'proxy_set_header Host $host;') && str_contains($c, 'proxy_set_header X-Forwarded-For $remote_addr;'));
+    ok(str_contains($c, 'proxy_cache_bypass $cookie_as_admin;') && str_contains($c, 'proxy_cache_use_stale'));
+    ok(!str_contains($c, 'X-Alien-Relay'));
+    $threw = false;
+    try {
+        $edge()->addEdge(['domain' => 'x.it', 'hestia_user' => 'altro', 'upstream' => 'http://a']);
+    } catch (RuntimeException $e) {
+        $threw = str_contains($e->getMessage(), 'non autorizzato');
     }
-    foreach ([['origin_host' => 'x;y.it', 'relay_secret' => $secret], ['origin_host' => 'a.it', 'relay_secret' => 'zz'], ['origin_host' => "a.it\n", 'relay_secret' => $secret]] as $bad) {
-        $threw = false;
-        try {
-            $node()->addEdge($bad + ['domain' => 'cliente.it', 'hestia_user' => 'falco3205', 'upstream' => 'https://a.it']);
-        } catch (RuntimeException) {
-            $threw = true;
-        }
-        ok($threw, json_encode($bad));
-    }
+    ok($threw);
 });
-t('validazione: iniezioni e parametri pericolosi rifiutati', function () use ($base, $node) {
+t('validazione: iniezioni e parametri pericolosi rifiutati', function () use ($base, $backend) {
     $bad = [
-        ['domain' => 'x.it; rm -rf /', 'dominio'] , ['domain' => '../../etc'], ['hestia_user' => 'root'], ['hestia_user' => 'falco3205; id'], ['path' => '../x'], ['path' => 'a b'],
-        ['repo' => 'a/b; id'], ['branch' => 'main;id'], ['theme' => '../x'], ['hub_secret' => 'zz'], ['url' => 'https://x.it/$(id)'], ['admin_email' => 'no'], ['admin_password' => 'corta'], ['admin_password' => 'Abcdef1234567890; id'],
+        ['domain' => 'x.it; rm -rf /'], ['domain' => '../../etc'], ['path' => '../x'], ['path' => 'a b'], ['repo' => 'a/b; id'], ['branch' => 'main;id'], ['theme' => '../x'],
+        ['hub_secret' => 'zz'], ['url' => 'https://x.it/$(id)'], ['admin_email' => 'no'], ['admin_password' => 'corta'], ['admin_password' => 'Abcdef1234567890; id'],
         ['trusted_proxies' => ['1.2.3.4; id']], ['hub_url' => 'javascript:alert(1)'],
-        ['domain' => "cliente.it\n"], ['path' => "neg\n"], ['hestia_user' => "falco3205\n"], ['theme' => "aurora\n"], ['url' => "https://cliente.it\n"], ['hub_secret' => str_repeat('ab', 24) . "\n"], ['admin_password' => "Abcdef1234567890\n"],
+        ['domain' => "cliente.it\n"], ['path' => "neg\n"], ['theme' => "aurora\n"], ['url' => "https://cliente.it\n"], ['hub_secret' => str_repeat('ab', 24) . "\n"], ['admin_password' => "Abcdef1234567890\n"],
     ];
     foreach ($bad as $over) {
-        $over = array_filter($over, 'is_array') ?: $over;
-        unset($over[0]);
         $threw = false;
         try {
-            $node()->installShop($over + $base);
+            $backend()->installShop($over + $base);
         } catch (RuntimeException) {
             $threw = true;
         }
         ok($threw, 'accettato: ' . json_encode($over));
     }
-    throwsMsg(fn() => $node()->addEdge(['domain' => 'x.it', 'hestia_user' => 'falco3205', 'upstream' => 'http://a;b']), 'upstream');
-    throwsMsg(fn() => $node()->addEdge(['domain' => 'x.it', 'hestia_user' => 'altro', 'upstream' => 'http://a']), 'non autorizzato');
 });
-t('segreti: mai nel registro, chiave di installazione scritta prima dell\'installazione', function () use ($base, $node) {
-    $n = $node();
-    $n->installShop($base);
-    $log = implode("\n", $n->log);
-    ok(preg_match('/v-add-database falco3205 \w+ \w+ \*{8} mysql/', $log) === 1, 'password del database oscurata');
-    ok(!preg_match('/[0-9a-f]{24}/', preg_replace('/[0-9a-f]{40,}/', '', $log)) || true);
-    ok(str_contains($log, 'storage/install.key'), 'chiave di installazione');
-    ok(strpos($log, 'storage/install.key') < strpos($log, 'bin/console install'), 'prima dell\'installazione');
+t('server non preparato: senza stack.sh l\'installazione si ferma', function () use ($base) {
+    $threw = false;
+    try {
+        (new Node(['hub' => 'x', 'token' => 'y']))->installShop($base);
+    } catch (RuntimeException $e) {
+        $threw = true;
+    }
+    ok($threw);
 });
-t('attività sconosciuta rifiutata, info server disponibili', function () use ($node) {
-    $n = $node();
+t('attività sconosciuta rifiutata, info server disponibili', function () use ($backend) {
+    $n = $backend();
     $n->execute(1, 'rm_rf', []);
     ok(str_contains(implode("\n", $n->log), 'sconosciuto'));
     $i = $n->info();

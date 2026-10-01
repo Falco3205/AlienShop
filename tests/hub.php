@@ -67,7 +67,7 @@ t('server: token, autenticazione, validazione', function () use ($backId, $backT
     eq(Nodes::authenticate($edgeToken)['role'], 'edge');
     [$id, , $errors] = Nodes::create('', 'backend', '', 'ftp://x', 'Bad User');
     eq($id, null);
-    eq(count($errors) >= 3, true);
+    eq(count($errors) >= 2, true);
     eq(DB::val('SELECT COUNT(*) FROM nodes WHERE token_hash = ?', [$backToken]), 0, 'il token non è salvato in chiaro');
 });
 
@@ -123,7 +123,7 @@ t('negozio dietro frontend: installazione poi pubblicazione, URL in sottocartell
     DB::update('nodes', ['trusted' => '10.0.0.0/24, 172.16.0.5'], 'id = ?', [$backId]);
     [$id2] = Shops::create(['name' => 'Neri', 'domain' => 'neri.it', 'admin_email' => 'n@neri.it', 'node_id' => $backId, 'mode' => 'edge', 'edge_node_id' => $edgeId]);
     $j2 = Jobs::claimFor($backId);
-    eq($j2[0]['payload']['trusted_proxies'], ['10.0.0.0/24', '172.16.0.5'], 'intervallo del tunnel al posto dell\'IP pubblico');
+    eq($j2[0]['payload']['trusted_proxies'], ['10.0.0.0/24', '172.16.0.5'], 'intervallo indicato al posto del default');
     DB::update('nodes', ['trusted' => ''], 'id = ?', [$backId]);
     [$nid, , $nerr] = Nodes::create('X', 'backend', '', 'http://10.0.0.2', 'falco3205', '1.2.3.4; id');
     eq($nid, null, 'intervallo non valido');
@@ -136,34 +136,16 @@ t('negozio dietro frontend: installazione poi pubblicazione, URL in sottocartell
     eq([Shops::find($id)['status'], Shops::find($id)['last_error']], ['error', 'nginx non valido']);
 });
 
-t('backend con tunnel Cloudflare: upstream dal hostname, segreto del relay, proxy fidati locali, segreto cifrato nel lavoro', function () use ($edgeId) {
-    [$id, , $err] = Nodes::create('Backend CF', 'backend', '198.51.100.7', '', 'falco3205', '', 'Backend-Origin.Falconefabio.it');
-    eq($err, []);
-    $n = Nodes::find($id);
-    eq([$n['upstream'], $n['tunnel_host'], strlen($n['relay_secret'])], ['https://backend-origin.falconefabio.it', 'backend-origin.falconefabio.it', 32]);
-    [$bad] = Nodes::create('X', 'backend', '', '', 'falco3205', '', 'non valido!');
-    eq($bad, null);
-    [$bad] = Nodes::create('X', 'backend', '', '', 'falco3205');
-    eq($bad, null, 'senza upstream né tunnel');
-    [$sid] = Shops::create(['name' => 'Tunnel', 'domain' => 'tunnel.it', 'admin_email' => 't@t.it', 'node_id' => $id, 'mode' => 'edge', 'edge_node_id' => $edgeId]);
-    $j = Jobs::claimFor($id)[0];
-    eq($j['payload']['trusted_proxies'], ['127.0.0.1', '198.51.100.7']);
-    Jobs::complete($j['id'], true, [], 'ok');
-    $e = Jobs::claimFor($edgeId);
-    $p = end($e)['payload'];
-    eq([$p['origin_host'], $p['relay_secret'], $p['upstream']], ['backend-origin.falconefabio.it', $n['relay_secret'], 'https://backend-origin.falconefabio.it']);
-    eq(str_contains((string)DB::val('SELECT payload FROM jobs WHERE shop_id = ? AND type = ?', [$sid, 'add_edge']), $n['relay_secret']), false, 'segreto cifrato a riposo');
-});
 t('backend su Tailscale: proxy fidati locali e l\'hub interroga il negozio dalla tailnet con Host del dominio', function () use ($edgeId) {
     [$id, , $err] = Nodes::create('Backend TS', 'backend', '198.51.100.8', 'http://100.101.102.103:80', 'falco3205');
     eq($err, []);
     $n = Nodes::find($id);
-    eq([Nodes::tailnet($n), Nodes::forwarded($n)], [true, true]);
+    eq(Nodes::tailnet($n), true);
     eq(Nodes::tailnet(['upstream' => 'http://10.0.0.2:80']), false);
     eq(Nodes::tailnet(['upstream' => 'http://100.128.0.1:80']), false, 'fuori da 100.64.0.0/10');
     [$sid] = Shops::create(['name' => 'TS', 'domain' => 'ts.it', 'path' => 'negozio', 'admin_email' => 't@t.it', 'node_id' => $id, 'mode' => 'edge', 'edge_node_id' => $edgeId]);
     $j = Jobs::claimFor($id)[0];
-    eq($j['payload']['trusted_proxies'], ['127.0.0.1', '198.51.100.8']);
+    eq($j['payload']['trusted_proxies'], ['100.64.0.0/10'], 'backend su tailnet: si fida dell\'intera tailnet');
     [$url, $headers, $private] = Hub\ShopClient::target(Shops::find($sid), '/hub/stats');
     eq([$url, $headers, $private], ['http://100.101.102.103:80/negozio/hub/stats', ['Host: ts.it', 'X-Forwarded-Proto: https'], true]);
     [$url2, $h2, $p2] = Hub\ShopClient::target(['node_id' => 1, 'domain' => 'x.it', 'path' => ''], '/hub/stats');
@@ -174,19 +156,6 @@ t('installazione fallita: stato errore con messaggio e nuovo tentativo', functio
     $j = Jobs::claimFor($backId)[0];
     Jobs::complete($j['id'], false, ['error' => 'database non creato'], 'log');
     eq([Shops::find($id)['status'], Shops::find($id)['last_error']], ['error', 'database non creato']);
-});
-
-t('claim da Hestia: crea il negozio con i valori predefiniti, rifiuta duplicati attivi', function () use ($backId) {
-    $node = Nodes::find($backId);
-    [$data, $err] = Shops::claim($node, 'falco3205', 'nuovo-dominio.it', '');
-    eq($err, null);
-    eq([$data['payload']['admin_email'], $data['payload']['hestia_user'], $data['payload']['domain']], ['me@test.it', 'falco3205', 'nuovo-dominio.it']);
-    eq(DB::val("SELECT status FROM jobs WHERE id = ?", [$data['job_id']]), 'running');
-    eq(Jobs::claimFor($backId), [], 'nessun job duplicato in coda');
-    Jobs::complete($data['job_id'], true, [], 'ok');
-    [$data2, $err2] = Shops::claim($node, 'falco3205', 'nuovo-dominio.it', '');
-    eq($data2, null);
-    eq($err2 !== null, true);
 });
 
 t('job bloccati vengono chiusi con errore', function () use ($backId) {

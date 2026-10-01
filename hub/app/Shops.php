@@ -59,9 +59,6 @@ final class Shops
         if (!$node || $node['role'] !== 'backend') {
             $errors[] = 'Scegli un server backend.';
         }
-        if ($node && $node['tunnel_host'] !== '' && $in['mode'] !== 'edge') {
-            $errors[] = 'Questo backend è raggiungibile solo tramite il tunnel: scegli la pubblicazione tramite frontend.';
-        }
         if ($in['mode'] === 'edge') {
             $edge = Nodes::find((int)$in['edge_node_id']);
             if (!$edge || $edge['role'] !== 'edge') {
@@ -86,8 +83,8 @@ final class Shops
         if ($ranges) {
             return $ranges;
         }
-        if (Nodes::forwarded($backend)) {
-            return array_values(array_filter(['127.0.0.1', $backend['address']]));
+        if (Nodes::tailnet($backend)) {
+            return ['100.64.0.0/10'];
         }
         return $edge['address'] ? [$edge['address']] : [];
     }
@@ -133,35 +130,6 @@ final class Shops
         return [$id, []];
     }
 
-    public static function claim(array $node, string $user, string $domain, string $path): array
-    {
-        $domain = mb_strtolower($domain);
-        $shop = DB::row('SELECT * FROM shops WHERE domain = ? AND path = ?', [$domain, $path]);
-        if ($shop && !in_array($shop['status'], ['pending', 'error'], true)) {
-            return [null, 'Esiste già un negozio attivo su questo dominio.'];
-        }
-        if (!$shop) {
-            [$id, $errors] = self::create([
-                'name' => $domain, 'domain' => $domain, 'path' => $path, 'node_id' => $node['id'],
-                'admin_email' => (string)Settings::get('default_admin_email', ''),
-            ]);
-            if (!$id) {
-                return [null, implode(' ', $errors)];
-            }
-            DB::exec("UPDATE jobs SET status = 'cancelled' WHERE shop_id = ? AND status = 'queued'", [$id]);
-            $shop = self::find($id);
-        } else {
-            DB::exec("UPDATE jobs SET status = 'cancelled' WHERE shop_id = ? AND status = 'queued'", [$shop['id']]);
-        }
-        $password = rtrim(strtr(base64_encode(random_bytes(12)), '+/', 'xz'), '=');
-        DB::update('shops', ['admin_password' => Secret::seal($password), 'hestia_user' => $user, 'status' => 'installing'], 'id = ?', [$shop['id']]);
-        $shop = self::find((int)$shop['id']);
-        $payload = self::installPayload($shop, $password);
-        $payload['hestia_user'] = $user;
-        $jobId = Jobs::startRunning((int)$node['id'], (int)$shop['id'], 'install_shop', $payload);
-        return [['job_id' => $jobId, 'payload' => $payload], null];
-    }
-
     public static function onJobDone(array $job, bool $ok, array $result, string $log): void
     {
         $shop = self::find((int)$job['shop_id']);
@@ -180,7 +148,7 @@ final class Shops
                 Jobs::queue((int)$shop['edge_node_id'], 'add_edge', [
                     'shop_id' => (int)$shop['id'], 'domain' => $shop['domain'], 'path' => $shop['path'],
                     'hestia_user' => (Nodes::find((int)$shop['edge_node_id']) ?? [])['hestia_user'] ?? '',
-                    'upstream' => $node['upstream'], 'origin_host' => $node['tunnel_host'], 'relay_secret' => $node['relay_secret'],
+                    'upstream' => $node['upstream'],
                 ], (int)$shop['id']);
                 return;
             }

@@ -29,8 +29,6 @@ CREATE TABLE IF NOT EXISTS nodes (
   address VARCHAR(190) NOT NULL DEFAULT '',
   upstream VARCHAR(190) NOT NULL DEFAULT '',
   trusted VARCHAR(190) NOT NULL DEFAULT '',
-  tunnel_host VARCHAR(190) NOT NULL DEFAULT '',
-  relay_secret VARCHAR(64) NOT NULL DEFAULT '',
   hestia_user VARCHAR(60) NOT NULL DEFAULT '',
   info TEXT,
   last_seen VARCHAR(19),
