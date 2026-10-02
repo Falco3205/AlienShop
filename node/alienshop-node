@@ -380,6 +380,7 @@ class Node
         }
 
         if ($installed) {
+            $this->sh(['php', "$app/bin/console", 'hub:connect', $p['hub_url']], $user, ['ALIEN_HUB_SECRET' => $p['hub_secret']]);
             $this->say('== Configurazione del server riallineata');
             return ['url' => $p['url'], 'database' => $user, 'user' => $user];
         }

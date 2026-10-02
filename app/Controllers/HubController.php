@@ -19,8 +19,16 @@ final class HubController extends Controller
         if (RateLimit::blocked('hubauth', 30, 600)) {
             return $this->json(['error' => 'rate_limited'], 429);
         }
-        $valid = HubAgent::configured() && HubSign::verify(HubAgent::secret(), $req->method, $req->path, $req->body(), $req->header('X-Alien-Time'), $req->header('X-Alien-Signature'), $req->header('X-Alien-Nonce'));
+        $time = $req->header('X-Alien-Time');
+        $valid = HubAgent::configured() && HubSign::verify(HubAgent::secret(), $req->method, $req->path, $req->body(), $time, $req->header('X-Alien-Signature'), $req->header('X-Alien-Nonce'));
         if (!$valid || !HubAgent::fresh($req->header('X-Alien-Nonce'))) {
+            $reason = !HubAgent::configured() ? 'hub non configurato su questo negozio'
+                : (!ctype_digit($time) || abs(time() - (int)$time) > 300 ? 'orario fuori tolleranza (differenza ' . (ctype_digit($time) ? time() - (int)$time : '?') . ' s)' : 'firma non valida: secret diverso o percorso diverso (' . $req->path . ')');
+            $log = ROOT . '/storage/logs/hub-auth.log';
+            if (!is_file($log) || filesize($log) < 100000) {
+                @mkdir(dirname($log), 0750, true);
+                @file_put_contents($log, '[' . now() . '] ' . $req->ip() . ' ' . $reason . "\n", FILE_APPEND);
+            }
             RateLimit::hit('hubauth', 1000, 600);
             return $this->json(['error' => 'unauthorized'], 403);
         }

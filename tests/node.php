@@ -65,6 +65,7 @@ t('ripetere un\'installazione già completata non tocca file e database, riallin
         ok(!str_contains($log, $bad), "non doveva eseguire: $bad");
     }
     ok(str_contains($log, 'pool.d/'), 'il pool PHP va riscritto');
+    ok(str_contains($log, 'bin/console hub:connect http://hub.falconefabio.it') && !str_contains($log, str_repeat('ab', 24)), 'il secret dell\'hub si riallinea via ambiente, mai in chiaro nel registro');
     ok($r['user'] === 'as_' . $slug);
     foreach (["$tmp/shops/$slug/app/config/config.php", "$tmp/shops/$slug/app/storage/installed.lock"] as $f) {
         unlink($f);

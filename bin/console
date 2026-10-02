@@ -186,11 +186,12 @@ switch ($command) {
         exit(0);
 
     case 'hub:connect':
-        if (!isset($args[0], $args[1])) {
-            fwrite(STDERR, "Uso: console hub:connect <url-hub> <secret>\n");
+        $hubSecret = $args[1] ?? (string)getenv('ALIEN_HUB_SECRET');
+        if (!isset($args[0]) || $hubSecret === '') {
+            fwrite(STDERR, "Uso: console hub:connect <url-hub> [<secret>]  (il secret può stare in ALIEN_HUB_SECRET)\n");
             exit(1);
         }
-        Alien\Services\HubAgent::connect($args[0], $args[1]);
+        Alien\Services\HubAgent::connect($args[0], $hubSecret);
         echo "Collegato all'hub.\n";
         exit(0);
 
