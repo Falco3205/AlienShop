@@ -147,6 +147,7 @@ class Node
     {
         $this->log = [];
         $this->redact = [];
+        $this->say('[' . date('Y-m-d H:i:s') . "] attività #$id: $type");
         try {
             $result = match ($type) {
                 'install_shop' => $this->installShop($p),
