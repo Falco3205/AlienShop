@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace Hub;
 
 use Alien\Core\DB;
+use Alien\Core\Settings;
 
 final class SelfUpdate
 {
@@ -17,13 +18,26 @@ final class SelfUpdate
         }
     }
 
+    public static function runIfRequested(): ?array
+    {
+        if (!Settings::get('update_requested', '')) {
+            return null;
+        }
+        Settings::set('update_requested', '');
+        return self::run();
+    }
+
     private static function pull(): array
     {
         if (!is_dir(REPO . '/.git')) {
             return ['ok' => false, 'message' => 'L\'hub non è stato installato con Git: aggiornalo riscaricando i file.'];
         }
         if (!function_exists('proc_open')) {
-            return ['ok' => false, 'message' => 'proc_open è disabilitata in PHP-FPM: aggiorna da terminale con "php hub/bin/hub update".'];
+            if (PHP_SAPI === 'cli') {
+                return ['ok' => false, 'message' => 'proc_open è disabilitata anche in PHP da terminale.'];
+            }
+            Settings::set('update_requested', now());
+            return ['ok' => true, 'message' => 'Aggiornamento in coda: parte entro 5 minuti (PHP-FPM non può eseguire git, lo fa il cron). Oppure: php hub/bin/hub update'];
         }
         $path = (string)getenv('PATH');
         $env = ['GIT_TERMINAL_PROMPT' => '0', 'PATH' => $path !== '' ? $path : '/usr/local/bin:/usr/bin:/bin', 'HOME' => ROOT . '/storage'];

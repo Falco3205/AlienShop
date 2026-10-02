@@ -44,6 +44,9 @@ DB::boot();
 
 switch ($command) {
     case 'poll':
+        if ($u = Hub\SelfUpdate::runIfRequested()) {
+            echo 'Aggiornamento hub: ' . $u['message'] . "\n";
+        }
         $r = Hub\Poller::pollAll();
         echo sprintf("Interrogati %d negozi: %d ok, %d con errori.\n", $r['total'], $r['ok'], $r['failed']);
         exit(0);
