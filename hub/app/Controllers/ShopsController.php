@@ -41,7 +41,7 @@ final class ShopsController extends Controller
                 return $this->back('shops/' . $id, 'Negozio messo in coda: il server lo installa entro un minuto.');
             }
         }
-        $themes = array_map('basename', glob(REPO . '/themes/*', GLOB_ONLYDIR) ?: []);
+        $themes = self::themeGallery();
         return $this->view('shops/new', [
             'title' => 'Nuovo negozio',
             'subtitle' => 'Scegli dominio, server e dove installarlo',
@@ -49,8 +49,39 @@ final class ShopsController extends Controller
             'errors' => $errors,
             'backends' => Nodes::byRole('backend'),
             'edges' => Nodes::byRole('edge'),
-            'themes' => array_values(array_filter($themes, static fn($t) => $t !== '_base')),
+            'themes' => $themes,
         ], 'shops');
+    }
+
+    private static function themeGallery(): array
+    {
+        $gallery = [];
+        foreach (glob(REPO . '/themes/*', GLOB_ONLYDIR) ?: [] as $dir) {
+            $slug = basename($dir);
+            if ($slug === '_base' || !is_file("$dir/theme.json")) {
+                continue;
+            }
+            $meta = json_decode((string)file_get_contents("$dir/theme.json"), true) ?: [];
+            $vars = [];
+            if (preg_match('/:root\{([^}]*)\}/', (string)@file_get_contents("$dir/style.css"), $m)) {
+                foreach (explode(';', $m[1]) as $decl) {
+                    [$k, $v] = array_pad(explode(':', $decl, 2), 2, '');
+                    $k = trim($k);
+                    $v = trim($v);
+                    if (preg_match('/^--[a-z-]+$/D', $k) && preg_match('/^[#a-zA-Z0-9 ,.()\/"\'%-]{1,120}$/D', $v)) {
+                        $vars[$k] = $v;
+                    }
+                }
+            }
+            $gallery[$slug] = [
+                'name' => (string)($meta['name'] ?? ucfirst($slug)),
+                'description' => (string)($meta['description'] ?? ''),
+                'layout' => (array)($meta['layout'] ?? []),
+                'vars' => $vars,
+            ];
+        }
+        ksort($gallery);
+        return $gallery;
     }
 
     public function show(Request $req, array $params): Response
