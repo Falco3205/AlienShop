@@ -10,7 +10,8 @@
   <form method="post" action="<?= e(url('shops/' . $shop['id'] . '/unsuspend')) ?>"><?= csrf_field() ?><button class="btn sm" type="submit">Riattiva</button></form>
   <?php elseif ($shop['status'] === 'error'): ?>
   <form method="post" action="<?= e(url('shops/' . $shop['id'] . '/retry')) ?>"><?= csrf_field() ?><button class="btn sm" type="submit"><?= Hub\Shops::failedStep($shop) === 'edge' ? 'Riprova la pubblicazione sul frontend' : 'Riprova l\'installazione' ?></button></form>
-  <?php endif ?></div>
+  <?php endif ?>
+  <form method="post" action="<?= e(url('shops/' . $shop['id'] . '/delete')) ?>" data-confirm="Rimuovere il negozio dall&#039;hub? Non cancella nulla sui server."><?= csrf_field() ?><button class="btn sec sm" type="submit">Rimuovi dall'hub</button></form></div>
 <?php if ($shop['last_error']): ?><div class="alert error"><?= e($shop['last_error']) ?></div><?php endif ?>
 <?php if ($password): ?><div class="alert info"><strong>Credenziali iniziali dell'admin del negozio</strong><br>Email: <code><?= e($shop['admin_email']) ?></code> · Password: <code><?= e($password) ?></code>
   <form method="post" action="<?= e(url('shops/' . $shop['id'] . '/forget-password')) ?>" style="margin-top:8px"><?= csrf_field() ?><button class="btn sec sm" type="submit">Le ho salvate: rimuovi dal pannello</button></form></div><?php endif ?>

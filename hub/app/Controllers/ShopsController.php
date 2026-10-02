@@ -182,6 +182,17 @@ final class ShopsController extends Controller
         return $this->back('shops/' . $shop['id'], 'Installazione rimessa in coda.');
     }
 
+    public function delete(Request $req, array $params): Response
+    {
+        $shop = $this->shop($params);
+        if (!$shop) {
+            return $this->back('shops', 'Negozio non trovato.', 'error');
+        }
+        DB::exec("DELETE FROM jobs WHERE shop_id = ? AND status = 'queued'", [$shop['id']]);
+        DB::exec('DELETE FROM shops WHERE id = ?', [$shop['id']]);
+        return $this->back('shops', 'Negozio rimosso dall\'hub. Sui server restano file, database e configurazione.');
+    }
+
     public function forgetPassword(Request $req, array $params): Response
     {
         Shops::forgetPassword((int)$params['id']);

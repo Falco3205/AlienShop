@@ -98,7 +98,7 @@ final class App
         $add('GET', '/shops', ShopsController::class, 'index');
         $both('/shops/new', ShopsController::class, 'create');
         $add('GET', '/shops/{id}', ShopsController::class, 'show');
-        foreach (['poll', 'update', 'open', 'suspend', 'unsuspend', 'notes', 'retry', 'forget-password'] as $a) {
+        foreach (['poll', 'update', 'open', 'suspend', 'unsuspend', 'notes', 'retry', 'forget-password', 'delete'] as $a) {
             $add('POST', '/shops/{id}/' . $a, ShopsController::class, lcfirst(str_replace('-', '', ucwords($a, '-'))));
         }
 

@@ -455,6 +455,7 @@ NGX;
         $user = $p['hestia_user'];
         $domain = $p['domain'];
         $this->say("== Pubblicazione di $domain tramite frontend");
+        $this->ensureTemplate();
         [$exists] = $this->hestia('v-list-web-domain', [$user, $domain], false);
         if ($exists !== 0 || $this->dry) {
             $this->hestia('v-add-web-domain', [$user, $domain]);
@@ -470,6 +471,24 @@ NGX;
         $this->hestia('v-restart-web', [], false);
         $this->say('== Frontend pronto');
         return ['upstream' => $p['upstream']];
+    }
+
+    private function ensureTemplate(): void
+    {
+        $dir = $this->cfg['hestia'] . '/data/templates/web/nginx/php-fpm';
+        if ($this->dry || is_file("$dir/alienshop-edge.tpl") && is_file("$dir/alienshop-edge.stpl") && is_file("$dir/alienshop-edge.sh")) {
+            return;
+        }
+        $this->say("Template Hestia 'alienshop-edge' mancante: lo scarico da GitHub");
+        foreach (['tpl' => 0644, 'stpl' => 0644, 'sh' => 0755] as $ext => $mode) {
+            $url = "https://raw.githubusercontent.com/{$this->cfg['repo']}/{$this->cfg['branch']}/node/hestia/alienshop-edge.$ext";
+            $body = @file_get_contents($url, false, stream_context_create(['http' => ['timeout' => 30, 'user_agent' => 'alienshop-node/' . AGENT_VERSION]]));
+            if (!is_string($body) || !str_contains($body, 'alienshop')) {
+                throw new RuntimeException("Impossibile scaricare il template Hestia ($url).");
+            }
+            $this->write("$dir/alienshop-edge.$ext", $body, $mode);
+        }
+        $this->write('/etc/nginx/conf.d/alienshop-cache.conf', "proxy_cache_path /var/cache/nginx/alienshop levels=1:2 keys_zone=alienshop:50m max_size=2g inactive=7d use_temp_path=off;\n");
     }
 
     public function edgeConfig(string $upstream): string
