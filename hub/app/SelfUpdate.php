@@ -9,10 +9,25 @@ final class SelfUpdate
 {
     public static function run(): array
     {
+        try {
+            return self::pull();
+        } catch (\Throwable $e) {
+            @file_put_contents(ROOT . '/storage/logs/error.log', '[' . now() . '] SelfUpdate: ' . $e->getMessage() . ' @ ' . $e->getFile() . ':' . $e->getLine() . "\n", FILE_APPEND);
+            return ['ok' => false, 'message' => 'Aggiornamento non riuscito: ' . $e->getMessage()];
+        }
+    }
+
+    private static function pull(): array
+    {
         if (!is_dir(REPO . '/.git')) {
             return ['ok' => false, 'message' => 'L\'hub non è stato installato con Git: aggiornalo riscaricando i file.'];
         }
-        $proc = @proc_open(['git', '-C', REPO, 'pull', '--ff-only'], [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, null, ['GIT_TERMINAL_PROMPT' => '0', 'PATH' => (string)getenv('PATH'), 'HOME' => (string)(getenv('HOME') ?: sys_get_temp_dir())]);
+        if (!function_exists('proc_open')) {
+            return ['ok' => false, 'message' => 'proc_open è disabilitata in PHP-FPM: aggiorna da terminale con "php hub/bin/hub update".'];
+        }
+        $path = (string)getenv('PATH');
+        $env = ['GIT_TERMINAL_PROMPT' => '0', 'PATH' => $path !== '' ? $path : '/usr/local/bin:/usr/bin:/bin', 'HOME' => ROOT . '/storage'];
+        $proc = @proc_open(['git', '-c', 'safe.directory=' . REPO, '-C', REPO, 'pull', '--ff-only'], [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, null, $env);
         if (!is_resource($proc)) {
             return ['ok' => false, 'message' => 'Git non disponibile.'];
         }
