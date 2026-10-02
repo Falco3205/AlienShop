@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# Aggiorna gli intervalli IP di Cloudflare per Nginx (IP reale dei visitatori).
+# Non scrive real_ip_header se è già definito altrove (Hestia lo fa) e, se Nginx non accetta
+# la configurazione, ripristina quella precedente: non lascia mai Nginx rotto.
+set -euo pipefail
+CONF=/etc/nginx/conf.d/alienshop-cloudflare.conf
+tmp="$(mktemp)"
+trap 'rm -f "$tmp"' EXIT
+{
+  echo "# Generato da alienshop: intervalli IP di Cloudflare"
+  for v in 4 6; do
+    curl -fsS --max-time 20 "https://www.cloudflare.com/ips-v$v" | grep -E '^[0-9a-fA-F:.]+(/[0-9]+)?$' | sed 's/^/set_real_ip_from /; s/$/;/'
+  done
+} > "$tmp"
+grep -q '^set_real_ip_from' "$tmp" || exit 1
+
+if ! grep -rEqs --include='*.conf' --include='*.inc' '^[[:space:]]*real_ip_header' /etc/nginx --exclude="$(basename "$CONF")"; then
+  echo "real_ip_header CF-Connecting-IP;" >> "$tmp"
+fi
+
+backup=""
+if [ -f "$CONF" ]; then backup="$(mktemp)"; cp -p "$CONF" "$backup"; fi
+install -m 644 "$tmp" "$CONF"
+if nginx -t >/dev/null 2>&1; then
+  systemctl reload nginx >/dev/null 2>&1 || true
+  [ -z "$backup" ] || rm -f "$backup"
+else
+  if [ -n "$backup" ]; then mv -f "$backup" "$CONF"; else rm -f "$CONF"; fi
+  echo "Nginx ha rifiutato la configurazione di Cloudflare: ripristinata la precedente." >&2
+  nginx -t >&2 || true
+  exit 1
+fi

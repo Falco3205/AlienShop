@@ -90,23 +90,7 @@ if [ "$ROLE" = "edge" ]; then
 
   if [ "$CLOUDFLARE" -eq 1 ]; then
     echo "==> Cloudflare: IP reale dei visitatori"
-    cat > /usr/local/bin/alienshop-cloudflare-ips <<'CFSCRIPT'
-#!/usr/bin/env bash
-set -euo pipefail
-tmp="$(mktemp)"
-{
-  echo "# Generato da alienshop: intervalli IP di Cloudflare"
-  for v in 4 6; do
-    curl -fsS --max-time 20 "https://www.cloudflare.com/ips-v$v" | grep -E '^[0-9a-fA-F:.]+(/[0-9]+)?$' | sed 's/^/set_real_ip_from /; s/$/;/'
-  done
-  echo "real_ip_header CF-Connecting-IP;"
-} > "$tmp"
-grep -q '^set_real_ip_from' "$tmp" || { rm -f "$tmp"; exit 1; }
-install -m 644 "$tmp" /etc/nginx/conf.d/alienshop-cloudflare.conf
-rm -f "$tmp"
-nginx -t >/dev/null 2>&1 && systemctl reload nginx >/dev/null 2>&1 || true
-CFSCRIPT
-    chmod 755 /usr/local/bin/alienshop-cloudflare-ips
+    install -m 755 /opt/alienshop/node/alienshop-cloudflare-ips /usr/local/bin/alienshop-cloudflare-ips
     /usr/local/bin/alienshop-cloudflare-ips || echo "Attenzione: impossibile scaricare gli intervalli di Cloudflare."
     printf '#!/bin/sh\n/usr/local/bin/alienshop-cloudflare-ips\n' > /etc/cron.weekly/alienshop-cloudflare
     chmod 755 /etc/cron.weekly/alienshop-cloudflare

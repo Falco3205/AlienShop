@@ -220,6 +220,7 @@ v-add-web-domain-ssl falco3205 dominio.it /root/ssl/dominio.it
 | 502 sul dominio del cliente | dal frontend: `curl -I -H 'Host: dominio.it' http://TS_BACKEND:80/`; `tailscale ping TS_BACKEND`; ACL di Tailscale; sul backend `nginx -t` e `tail /var/log/nginx/error.log` |
 | 526 / errore certificato | certificato di origine sul frontend (passo 7) |
 | 500 dentro il negozio | `tail` del log PHP-FPM sul backend (`/var/log/php*-fpm.log`) e `storage/logs/error.log` del negozio (`/var/www/alienshop/shops/<slug>/app/storage/logs/`) |
+| `nginx -t` dice «real_ip_header directive is duplicate» sul frontend | Hestia o un altro file lo definisce già. Aggiorna lo script: `curl -fsSL https://raw.githubusercontent.com/Falco3205/AlienShop/main/node/alienshop-cloudflare-ips -o /usr/local/bin/alienshop-cloudflare-ips && chmod 755 /usr/local/bin/alienshop-cloudflare-ips && /usr/local/bin/alienshop-cloudflare-ips` (non scrive il duplicato e, se Nginx rifiuta la configurazione, ripristina la precedente). Finché `nginx -t` fallisce, nessuna modifica di Hestia o di AlienShop viene applicata e le pagine rispondono 403 |
 | Tutti i visitatori con lo stesso IP, login bloccati per tutti | manca `--cloudflare` sul frontend, o il campo *IP da cui il backend vede arrivare il frontend* (con Tailscale lo imposta il pannello) |
 
 ## Limiti noti (leggi prima di usarlo con clienti veri)
