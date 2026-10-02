@@ -1,7 +1,9 @@
-:root{--bg:#fff;--surface:#eef3f9;--text:#0b1a2e;--muted:#5b6b82;--primary:#0b63f6;--primary-contrast:#fff;--accent:#00a58e;--border:#d9e2ef;--radius:4px;--font:var(--font-human);--heading-font:var(--font-mono);--heading-weight:700;--heading-spacing:-.03em;--ring:#0b63f633}
-.site-header{border-bottom:1px solid var(--border)}.logo{font-family:var(--font-mono);font-size:1.2rem}.logo::before{content:"▍";color:var(--primary);margin-right:2px}
-.nav a{font-family:var(--font-mono);font-size:.8rem;text-transform:lowercase}
-.btn{border-radius:4px;font-family:var(--font-mono);font-size:.88rem;box-shadow:0 0 0 1px #0b63f6 inset,0 6px 18px rgba(11,99,246,.28)}.btn:hover{opacity:1;background:#0950c7}
+@font-face{font-family:"JetBrains Mono";src:url(fonts/jetbrains-mono.woff2) format("woff2");font-weight:100 800;font-style:normal;font-display:swap}
+@font-face{font-family:"Inter";src:url(fonts/inter.woff2) format("woff2");font-weight:100 900;font-style:normal;font-display:swap}
+:root{--font:"Inter",system-ui,sans-serif;--heading-font:"JetBrains Mono",ui-monospace,monospace;--bg:#fff;--surface:#eef3f9;--text:#0b1a2e;--muted:#5b6b82;--primary:#0b63f6;--primary-contrast:#fff;--accent:#00a58e;--border:#d9e2ef;--radius:4px;--heading-weight:700;--heading-spacing:-.03em;--ring:#0b63f633}
+.site-header{border-bottom:1px solid var(--border)}.logo{font-family:"JetBrains Mono";font-size:1.2rem}.logo::before{content:"▍";color:var(--primary);margin-right:2px}
+.nav a{font-family:"JetBrains Mono";font-size:.8rem;text-transform:lowercase}
+.btn{border-radius:4px;font-family:"JetBrains Mono";font-size:.88rem;box-shadow:0 0 0 1px #0b63f6 inset,0 6px 18px rgba(11,99,246,.28)}.btn:hover{opacity:1;background:#0950c7}
 .btn-outline{background:#fff;box-shadow:none}
 .hero-split{background:linear-gradient(#eef3f9,#fff);background-image:linear-gradient(rgba(11,99,246,.07) 1px,transparent 1px),linear-gradient(90deg,rgba(11,99,246,.07) 1px,transparent 1px);background-size:36px 36px;background-color:#f6f9fd}
 .hero h1{font-size:clamp(2.2rem,5vw,3.6rem)}.hero h1::before{content:">";color:var(--primary);margin-right:.35em}
@@ -9,8 +11,8 @@
 .hero-art i:nth-child(1){width:260px;height:260px;right:8%;top:14%}.hero-art i:nth-child(2){width:180px;height:180px;right:17%;top:30%;border-color:var(--accent);background:rgba(0,165,142,.08)!important}.hero-art i:nth-child(3){width:12px;height:12px;right:30%;top:22%;background:var(--primary)!important;border:0;opacity:1}
 .section-head h2{font-size:1.25rem}.section-head h2::before{content:"// ";color:var(--accent)}
 .c-border .card{border:1px solid var(--border);border-radius:6px;background:#fff;transition:border-color .2s,box-shadow .2s}.c-border .card:hover{border-color:var(--primary);box-shadow:0 0 0 3px rgba(11,99,246,.12)}
-.card-media{border-bottom:1px solid var(--border)}.card-title{font-size:.95rem}.price{font-family:var(--font-mono);color:var(--primary)}
+.card-media{border-bottom:1px solid var(--border)}.card-title{font-size:.95rem}.price{font-family:"JetBrains Mono";color:var(--primary)}
 .cat-tile{border-radius:6px;border:1px solid var(--border)}.cat-tile span{font-size:1rem}
-.tag{font-family:var(--font-mono);background:var(--accent);border-radius:3px}
-.site-footer{background:#0b1a2e;color:#b9c6da;border:0}.site-footer h4,.footer-grid>div:first-child h4{color:#fff}.footer-grid h4{color:#6f86a6;font-family:var(--font-mono)}.copyright{border-color:#1c2e47;color:#6f86a6}.newsletter{background:#10253f;border-color:#1c2e47}.site-footer input{background:#0b1a2e;border-color:#1c2e47;color:#fff}.footer-grid>div:first-child p{color:#8ea3c0}
+.tag{font-family:"JetBrains Mono";background:var(--accent);border-radius:3px}
+.site-footer{background:#0b1a2e;color:#b9c6da;border:0}.site-footer h4,.footer-grid>div:first-child h4{color:#fff}.footer-grid h4{color:#6f86a6;font-family:"JetBrains Mono"}.copyright{border-color:#1c2e47;color:#6f86a6}.newsletter{background:#10253f;border-color:#1c2e47}.site-footer input{background:#0b1a2e;border-color:#1c2e47;color:#fff}.footer-grid>div:first-child p{color:#8ea3c0}
 .hero-art{-webkit-mask-image:none;mask-image:none}

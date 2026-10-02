@@ -114,6 +114,7 @@ final class Themes
                 }
             }
         }
+        self::copyFonts($css, $dir);
         file_put_contents($dir . '/' . $cssName, $css);
         if (!is_file($dir . '/' . $jsName)) {
             foreach (glob($dir . '/app-*.js') ?: [] as $old) {
@@ -126,6 +127,21 @@ final class Themes
             Settings::set('asset_js', $jsName);
         }
         return ['css' => $cssName, 'js' => $jsName];
+    }
+
+    private static function copyFonts(string $css, string $dir): void
+    {
+        if (!preg_match_all('#fonts/([a-z0-9-]+\.woff2)#', $css, $m)) {
+            return;
+        }
+        foreach (array_unique($m[1]) as $font) {
+            $src = ROOT . '/themes/_base/fonts/' . $font;
+            $dst = $dir . '/fonts/' . $font;
+            if (is_file($src) && !is_file($dst)) {
+                @mkdir($dir . '/fonts', 0755, true);
+                @copy($src, $dst);
+            }
+        }
     }
 
     public static function assets(?string $previewSlug = null): array

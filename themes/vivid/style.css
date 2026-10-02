@@ -1,4 +1,5 @@
-:root{--bg:#fff;--surface:#fff3e4;--text:#1e1633;--muted:#6f6786;--primary:#ff5a36;--primary-contrast:#fff;--accent:#7b2ff7;--border:#f1e3d0;--radius:20px;--font:var(--font-round);--heading-font:var(--font-round);--heading-weight:800;--heading-spacing:-.03em;--shadow:0 14px 36px rgba(123,47,247,.16);--ring:#7b2ff733}
+@font-face{font-family:"Outfit";src:url(fonts/outfit.woff2) format("woff2");font-weight:100 900;font-style:normal;font-display:swap}
+:root{--font:"Outfit",system-ui,sans-serif;--heading-font:"Outfit",system-ui,sans-serif;--bg:#fff;--surface:#fff3e4;--text:#1e1633;--muted:#6f6786;--primary:#ff5a36;--primary-contrast:#fff;--accent:#7b2ff7;--border:#f1e3d0;--radius:20px;--heading-weight:800;--heading-spacing:-.03em;--shadow:0 14px 36px rgba(123,47,247,.16);--ring:#7b2ff733}
 .announce{background:linear-gradient(90deg,#ff5a36,#7b2ff7);font-weight:700}
 .site-header{background:rgba(255,255,255,.85)}.logo{background:linear-gradient(90deg,#ff5a36,#7b2ff7);-webkit-background-clip:text;background-clip:text;color:transparent}
 .btn{border-radius:999px;background:linear-gradient(135deg,#ff5a36,#ff8a3d);border:0;padding:14px 30px;box-shadow:0 12px 26px rgba(255,90,54,.4)}.btn:hover{opacity:1;transform:translateY(-3px) scale(1.02)}

@@ -1,6 +1,9 @@
-:root{--bg:#fffdf2;--surface:#ffe14d;--text:#111;--muted:#444;--primary:#111;--primary-contrast:#ffe14d;--accent:#ff3b30;--border:#111;--radius:0;--font:var(--font-mono);--heading-font:var(--font-mono);--heading-weight:800;--heading-transform:uppercase;--btn-transform:uppercase;--ring:#ff3b3055}
+@font-face{font-family:"Space Grotesk";src:url(fonts/space-grotesk.woff2) format("woff2");font-weight:300 700;font-style:normal;font-display:swap}
+@font-face{font-family:"Space Mono";src:url(fonts/space-mono-400.woff2) format("woff2");font-weight:400;font-style:normal;font-display:swap}
+@font-face{font-family:"Space Mono";src:url(fonts/space-mono-700.woff2) format("woff2");font-weight:700;font-style:normal;font-display:swap}
+:root{--font:"Space Grotesk",system-ui,sans-serif;--heading-font:"Space Mono",ui-monospace,monospace;--bg:#fffdf2;--surface:#ffe14d;--text:#111;--muted:#444;--primary:#111;--primary-contrast:#ffe14d;--accent:#ff3b30;--border:#111;--radius:0;--heading-weight:800;--heading-transform:uppercase;--btn-transform:uppercase;--ring:#ff3b3055}
 body{font-size:15px}
-.announce{background:#ff3b30;color:#fff;font-family:var(--font-mono);text-transform:uppercase;font-weight:800;letter-spacing:.08em;border-bottom:3px solid #111}
+.announce{background:#ff3b30;color:#fff;font-family:"Space Mono";text-transform:uppercase;font-weight:800;letter-spacing:.08em;border-bottom:3px solid #111}
 .site-header{border-bottom:4px solid #111;background:#fffdf2}.logo{font-size:1.6rem;background:#111;color:#ffe14d;padding:2px 12px;transform:rotate(-1.5deg)}
 .nav a{text-transform:uppercase;font-weight:700;font-size:.82rem}.nav>a::after{height:4px;background:#ff3b30}
 .btn{border:3px solid #111;box-shadow:6px 6px 0 #111;border-radius:0;font-weight:800}.btn:hover{transform:translate(3px,3px);box-shadow:3px 3px 0 #111;opacity:1;color:var(--primary-contrast)}

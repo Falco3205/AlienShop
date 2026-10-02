@@ -1,4 +1,6 @@
-:root{--bg:#f7f5ee;--surface:#e9ecdf;--text:#25301f;--muted:#69745f;--primary:#3f6b3a;--primary-contrast:#fff;--accent:#c98a3c;--border:#d9dfc9;--radius:16px;--font:var(--font-human);--heading-font:var(--font-serif);--heading-weight:700;--heading-spacing:-.01em;--ring:#3f6b3a33}
+@font-face{font-family:"Fraunces";src:url(fonts/fraunces.woff2) format("woff2");font-weight:100 900;font-style:normal;font-display:swap}
+@font-face{font-family:"Nunito Sans";src:url(fonts/nunito-sans.woff2) format("woff2");font-weight:200 1000;font-style:normal;font-display:swap}
+:root{--font:"Nunito Sans",system-ui,sans-serif;--heading-font:"Fraunces",Georgia,serif;--bg:#f7f5ee;--surface:#e9ecdf;--text:#25301f;--muted:#69745f;--primary:#3f6b3a;--primary-contrast:#fff;--accent:#c98a3c;--border:#d9dfc9;--radius:16px;--heading-weight:700;--heading-spacing:-.01em;--ring:#3f6b3a33}
 .site-header{background:rgba(247,245,238,.88)}.logo{font-style:italic}
 .btn{border-radius:999px;padding:13px 28px;box-shadow:0 8px 20px rgba(63,107,58,.25)}.btn:hover{background:#2f5a2b;opacity:1}
 .hero-full .hero{background:#2f4a2b center/cover}.hero-full .hero::before{background:linear-gradient(100deg,rgba(32,50,28,.88),rgba(32,50,28,.25))}

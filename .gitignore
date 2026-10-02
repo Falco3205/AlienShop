@@ -10,3 +10,4 @@
 /hub/config/config.php
 /hub/storage/*
 !/hub/storage/.gitkeep
+/public/assets/fonts/

@@ -1,4 +1,5 @@
-:root{--bg:#0b0d16;--surface:#141827;--text:#eceefb;--muted:#9aa0bd;--primary:#7c5cff;--primary-contrast:#fff;--accent:#22d3ee;--border:#232842;--radius:14px;--font:var(--font-human);--heading-weight:800;--heading-spacing:-.02em;--shadow:0 18px 50px rgba(0,0,0,.55);--ring:#22d3ee44}
+@font-face{font-family:"Sora";src:url(fonts/sora.woff2) format("woff2");font-weight:100 800;font-style:normal;font-display:swap}
+:root{--font:"Sora",system-ui,sans-serif;--heading-font:"Sora",system-ui,sans-serif;--bg:#0b0d16;--surface:#141827;--text:#eceefb;--muted:#9aa0bd;--primary:#7c5cff;--primary-contrast:#fff;--accent:#22d3ee;--border:#232842;--radius:14px;--heading-weight:800;--heading-spacing:-.02em;--shadow:0 18px 50px rgba(0,0,0,.55);--ring:#22d3ee44}
 body{background:radial-gradient(1000px 600px at 90% -10%,rgba(124,92,255,.18),transparent 60%),radial-gradient(800px 500px at -10% 40%,rgba(34,211,238,.1),transparent 60%),#0b0d16}
 .site-header{background:rgba(11,13,22,.7);border-color:#232842}
 .btn{background:linear-gradient(135deg,#7c5cff,#5b8cff);border:0;border-radius:12px;box-shadow:0 0 0 1px rgba(255,255,255,.12) inset,0 10px 30px rgba(124,92,255,.45)}

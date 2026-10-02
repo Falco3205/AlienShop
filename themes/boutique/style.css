@@ -1,8 +1,11 @@
-:root{--bg:#faf6f1;--surface:#efe6db;--text:#2b2118;--muted:#7d6e60;--primary:#2b2118;--primary-contrast:#faf6f1;--accent:#8c5e3c;--border:#dccfbf;--radius:2px;--font:var(--font-serif);--heading-font:var(--font-serif);--heading-weight:400;--heading-spacing:.01em;--card-img-ratio:4/5;--btn-transform:uppercase;--section-gap:88px}
+@font-face{font-family:"Cormorant Garamond";src:url(fonts/cormorant-garamond.woff2) format("woff2");font-weight:300 700;font-style:normal;font-display:swap}
+@font-face{font-family:"Cormorant Garamond";src:url(fonts/cormorant-garamond-italic.woff2) format("woff2");font-weight:300 700;font-style:italic;font-display:swap}
+@font-face{font-family:"Jost";src:url(fonts/jost.woff2) format("woff2");font-weight:100 900;font-style:normal;font-display:swap}
+:root{--font:"Jost",system-ui,sans-serif;--heading-font:"Cormorant Garamond",Georgia,serif;--bg:#faf6f1;--surface:#efe6db;--text:#2b2118;--muted:#7d6e60;--primary:#2b2118;--primary-contrast:#faf6f1;--accent:#8c5e3c;--border:#dccfbf;--radius:2px;--heading-weight:400;--heading-spacing:.01em;--card-img-ratio:4/5;--btn-transform:uppercase;--section-gap:88px}
 body{font-size:17px}
 .site-header{background:rgba(250,246,241,.9);border-bottom:1px solid var(--border)}
 .logo{font-style:italic;font-size:2rem;letter-spacing:.02em}
-.nav a,.btn,.price,.section-head a{font-family:var(--font-human)}
+.nav a,.btn,.price,.section-head a{font-family:"Jost"}
 .nav a{text-transform:uppercase;letter-spacing:.16em;font-size:.72rem;font-weight:500}
 .btn{border-radius:0;letter-spacing:.2em;font-size:.74rem;padding:16px 34px;box-shadow:none}
 .btn:hover{background:var(--accent);border-color:var(--accent);opacity:1}
@@ -20,6 +23,7 @@ body{font-size:17px}
 .card{background:transparent}.card-body{text-align:center;padding:16px 4px 4px}
 .card-title{font-weight:400;font-size:1.12rem}.price{font-weight:500;color:var(--muted)}
 .cat-tile{border-radius:0}.cat-tile span{justify-content:center;font-style:italic;font-weight:400;font-size:1.5rem}.cat-tile span::after{display:none}
-.tag{border-radius:0;background:var(--text);font-family:var(--font-human);letter-spacing:.12em;text-transform:uppercase;font-size:.62rem}
+.tag{border-radius:0;background:var(--text);font-family:"Jost";letter-spacing:.12em;text-transform:uppercase;font-size:.62rem}
 .site-footer{background:var(--text);color:#d9ccbd;border:0}.site-footer h4,.footer-grid>div:first-child h4{color:#faf6f1}.footer-grid>div:first-child h4{font-style:italic}.footer-grid h4{color:#a8977f}.copyright{border-color:#46382c;color:#a8977f}.newsletter{background:#362a20;border-color:#46382c}.site-footer input{background:#2b2118;border-color:#46382c;color:#fff}.footer-grid>div:first-child p{color:#bcae9c}
 .hero-art{-webkit-mask-image:none;mask-image:none}
+.hero h1{font-size:clamp(2.8rem,6.5vw,5rem)}.section-head h2{font-size:2.7rem}.card-title{font-size:1.3rem}.logo{font-size:2.4rem}.cat-tile span{font-size:1.9rem}.nav a{font-size:.74rem}

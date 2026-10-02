@@ -1,4 +1,5 @@
-:root{--bg:#fff;--surface:#f5f6fe;--text:#14142b;--muted:#6e7191;--primary:#4f46e5;--primary-contrast:#fff;--accent:#f43f5e;--border:#e6e8f5;--radius:12px;--font:var(--font-human);--heading-weight:800;--heading-spacing:-.02em;--shadow:0 12px 40px rgba(79,70,229,.14)}
+@font-face{font-family:"Plus Jakarta Sans";src:url(fonts/plus-jakarta-sans.woff2) format("woff2");font-weight:200 800;font-style:normal;font-display:swap}
+:root{--font:"Plus Jakarta Sans",system-ui,sans-serif;--heading-font:"Plus Jakarta Sans",system-ui,sans-serif;--bg:#fff;--surface:#f5f6fe;--text:#14142b;--muted:#6e7191;--primary:#4f46e5;--primary-contrast:#fff;--accent:#f43f5e;--border:#e6e8f5;--radius:12px;--heading-weight:800;--heading-spacing:-.02em;--shadow:0 12px 40px rgba(79,70,229,.14)}
 body{background:linear-gradient(180deg,#fff,#faf8ff 60%,#fff)}
 .site-header{background:rgba(255,255,255,.78)}
 .btn{background:linear-gradient(135deg,#5b52f0,#8b5cf6);border:0;border-radius:999px;box-shadow:0 10px 24px rgba(91,82,240,.35);padding:13px 26px}
