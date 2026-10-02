@@ -69,6 +69,16 @@ final class NodesController extends Controller
         return $this->back('nodes/' . $node['id'], 'Nuovo token generato: aggiorna il server con il comando qui sotto.');
     }
 
+    public function updateAgent(Request $req, array $params): Response
+    {
+        $node = Nodes::find((int)$params['id']);
+        if (!$node) {
+            return $this->back('nodes', 'Server non trovato.', 'error');
+        }
+        \Hub\Jobs::queue((int)$node['id'], 'node_update', []);
+        return $this->back('nodes/' . $node['id'], 'Aggiornamento dell\'agente in coda: parte entro un minuto, controlla Attività.');
+    }
+
     private function command(array $node, string $token): string
     {
         $repo = (string)Settings::get('shop_repo', 'Falco3205/AlienShop');

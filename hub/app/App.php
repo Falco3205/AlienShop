@@ -106,6 +106,7 @@ final class App
         $both('/nodes/new', NodesController::class, 'create');
         $add('GET', '/nodes/{id}', NodesController::class, 'show');
         $add('POST', '/nodes/{id}/token', NodesController::class, 'token');
+        $add('POST', '/nodes/{id}/update-agent', NodesController::class, 'updateAgent');
 
         $add('GET', '/jobs', JobsController::class, 'index');
         $add('GET', '/jobs/{id}', JobsController::class, 'show');

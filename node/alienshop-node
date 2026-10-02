@@ -2,7 +2,7 @@
 <?php
 declare(strict_types=1);
 
-const AGENT_VERSION = '2.0.0';
+const AGENT_VERSION = '2.1.0';
 
 class Node
 {
@@ -636,9 +636,26 @@ NGX;
 
     private function selfUpdate(): array
     {
-        $dir = dirname(realpath(__FILE__) ?: __FILE__, 2);
-        $this->sh(['git', '-C', $dir, 'pull', '--ff-only']);
-        return [];
+        $self = realpath(__FILE__) ?: __FILE__;
+        $url = "https://raw.githubusercontent.com/{$this->cfg['repo']}/{$this->cfg['branch']}/node/alienshop-node";
+        $this->say("Scarico l'agente da $url");
+        $body = @file_get_contents($url, false, stream_context_create(['http' => ['timeout' => 30, 'user_agent' => 'alienshop-node/' . AGENT_VERSION]]));
+        if (!is_string($body) || !str_starts_with($body, "#!/usr/bin/env -S php") || !str_contains($body, 'final class') && !str_contains($body, 'class Node') || !preg_match("/const AGENT_VERSION = '([\d.]+)';/", $body, $m)) {
+            throw new RuntimeException('Il file scaricato non è un agente valido: aggiornamento annullato.');
+        }
+        $tmp = $self . '.new';
+        if (!$this->dry) {
+            file_put_contents($tmp, $body);
+            chmod($tmp, 0755);
+            [$code, $out] = $this->sh(['php', '-l', $tmp], null, [], false);
+            if ($code !== 0) {
+                @unlink($tmp);
+                throw new RuntimeException('Il nuovo agente non supera il controllo di sintassi: ' . $out);
+            }
+            rename($tmp, $self);
+        }
+        $this->say("Agente aggiornato dalla versione " . AGENT_VERSION . " alla {$m[1]}");
+        return ['version' => $m[1]];
     }
 }
 

@@ -14,5 +14,7 @@
 <div><div class="card"><h2>Negozi su questo server</h2>
 <?php foreach ($shops as $s): ?><p style="margin:0 0 8px"><a href="<?= e(url('shops/' . $s['id'])) ?>"><?= e($s['name']) ?></a> <span class="muted"><?= e($s['domain'] . ($s['path'] ? '/' . $s['path'] : '')) ?></span></p><?php endforeach ?>
 <?php if (!$shops): ?><p class="muted">Nessuno.</p><?php endif ?></div>
+<div class="card"><h2>Agente</h2><p class="muted">Versione installata: <code><?= e($info['agent'] ?? '—') ?></code>. L'aggiornamento scarica l'ultimo agente da GitHub, ne controlla la sintassi e lo sostituisce da solo: niente da digitare sul server.</p>
+<form method="post" action="<?= e(url('nodes/' . $node['id'] . '/update-agent')) ?>"><?= csrf_field() ?><button class="btn sm" type="submit">Aggiorna l'agente</button></form></div>
 <div class="card"><h2>Token</h2><p class="muted">Se hai perso il token o vuoi sostituirlo, generane uno nuovo: l'agente smetterà di funzionare finché non lo aggiorni.</p>
 <form method="post" action="<?= e(url('nodes/' . $node['id'] . '/token')) ?>" data-confirm="Generare un nuovo token?"><?= csrf_field() ?><button class="btn sec sm" type="submit">Genera un nuovo token</button></form></div></div></div>
