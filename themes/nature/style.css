@@ -1,5 +1,12 @@
-:root{--bg:#f7f5ee;--surface:#e9ecdf;--text:#25301f;--muted:#6b7561;--primary:#3f6b3a;--primary-contrast:#fff;--accent:#c98a3c;--border:#dbe0cd;--radius:14px;--heading-weight:700}
-.hero-full .hero{background-color:#2f4f2c;background-image:linear-gradient(135deg,#2f4f2c,#6a8f4e)}
-.hero-full .hero::before{background:linear-gradient(90deg,rgba(25,45,22,.7),rgba(25,45,22,.1))}
-.site-footer{background:#2f4f2c;color:#e6eadb}.site-footer a,.site-footer h4,.copyright{color:#e6eadb}.copyright{border-color:rgba(255,255,255,.2)}
-.card{background:#fff}
+:root{--bg:#f7f5ee;--surface:#e9ecdf;--text:#25301f;--muted:#69745f;--primary:#3f6b3a;--primary-contrast:#fff;--accent:#c98a3c;--border:#d9dfc9;--radius:16px;--font:var(--font-human);--heading-font:var(--font-serif);--heading-weight:700;--heading-spacing:-.01em;--ring:#3f6b3a33}
+.site-header{background:rgba(247,245,238,.88)}.logo{font-style:italic}
+.btn{border-radius:999px;padding:13px 28px;box-shadow:0 8px 20px rgba(63,107,58,.25)}.btn:hover{background:#2f5a2b;opacity:1}
+.hero-full .hero{background:#2f4a2b center/cover}.hero-full .hero::before{background:linear-gradient(100deg,rgba(32,50,28,.88),rgba(32,50,28,.25))}
+.hero h1{font-weight:700}
+.hero-art i{filter:none;opacity:.2;background:#a9c98a;border-radius:58% 42% 63% 37%/40% 55% 45% 60%}
+.hero-art i:nth-child(1){width:520px;height:480px;right:-80px;top:-100px;background:#7fae6a}.hero-art i:nth-child(2){width:300px;height:280px;right:26%;bottom:-120px;background:#c98a3c;opacity:.28}.hero-art i:nth-child(3){width:110px;height:100px;right:10%;top:50%;background:#e8d9a8;opacity:.5}
+.section-head h2::before{content:"❧";display:block;color:var(--accent);font-size:1.2rem;margin-bottom:4px}
+.c-border .card{border:1px solid var(--border);border-radius:26px 6px 26px 6px;background:#fffdf7;transition:transform .3s,box-shadow .3s}.c-border .card:hover{transform:translateY(-4px);box-shadow:0 18px 40px rgba(63,107,58,.15)}
+.card-media{border-radius:26px 6px 0 0}.price{color:var(--primary)}
+.cat-tile{border-radius:34px 8px 34px 8px}.tag{background:var(--accent);border-radius:999px}
+.site-footer{background:#2f4a2b;color:#dfe8d0;border:0}.site-footer h4,.footer-grid>div:first-child h4{color:#fff}.footer-grid h4{color:#a8c294}.copyright{border-color:#46633f;color:#a8c294}.newsletter{background:#3a5a35;border-color:#46633f}.site-footer input{background:#2f4a2b;border-color:#46633f;color:#fff}.footer-grid>div:first-child p{color:#c3d4b3}

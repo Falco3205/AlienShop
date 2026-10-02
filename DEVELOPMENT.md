@@ -104,3 +104,7 @@ Backend nativo: provato in un container con Nginx, PHP-FPM e MariaDB reali (`nod
 - Nuovo gateway: `app/Payments/MioGateway.php` (classe `MioGateway extends Gateway`).
 - Nuovo tema: cartella in `themes/` con `theme.json` e `style.css`; sovrascrivi solo le viste che servono.
 - Nuova lingua: `lang/<codice>.php` e voce in `Lang::available()`.
+
+## Grafica dei temi
+
+`themes/_base/assets/base.css` è il sistema comune (hero a tutta larghezza con forme decorative `.hero-art`, categorie a tessere con titolo sull'immagine, schede prodotto, footer, animazioni leggere). Ogni tema (`themes/<nome>/style.css`) ridefinisce i token `:root` (colori, `--radius`, `--font`, `--heading-font`, `--section-gap`…) e poi ne cambia il carattere: header, bottoni, forme dell'hero (`.hero-art i:nth-child(1..3)`), titoli di sezione, schede, tessere categoria, etichette e footer. Solo font di sistema (la CSP non consente font esterni): gli stack `--font-serif`, `--font-human`, `--font-round`, `--font-mono` sono definiti nella base. Per un tema nuovo basta una cartella con `theme.json` e `style.css`.
