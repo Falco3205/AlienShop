@@ -171,6 +171,11 @@ final class ShopsController extends Controller
         if (!$shop || $shop['status'] !== 'error') {
             return $this->back('shops', 'Niente da ripetere.', 'error');
         }
+        if (Shops::failedStep($shop) === 'edge') {
+            DB::update('shops', ['status' => 'pending', 'last_error' => ''], 'id = ?', [$shop['id']]);
+            Shops::queueEdge($shop);
+            return $this->back('shops/' . $shop['id'], 'Pubblicazione sul frontend rimessa in coda.');
+        }
         $password = rtrim(strtr(base64_encode(random_bytes(12)), '+/', 'xz'), '=');
         DB::update('shops', ['status' => 'pending', 'last_error' => '', 'admin_password' => \Alien\Core\Secret::seal($password)], 'id = ?', [$shop['id']]);
         Jobs::queue((int)$shop['node_id'], 'install_shop', Shops::installPayload(Shops::find((int)$shop['id']), $password), (int)$shop['id']);

@@ -188,6 +188,27 @@ t('installazione fallita: stato errore con messaggio e nuovo tentativo', functio
     eq([Shops::find($id)['status'], Shops::find($id)['last_error']], ['error', 'database non creato']);
 });
 
+t('pubblicazione sul frontend fallita: si rilancia solo quella, senza reinstallare il negozio', function () use ($backId, $edgeId) {
+    [$id] = Shops::create(['name' => 'Rossi', 'domain' => 'rossi.it', 'admin_email' => 'r@rossi.it', 'node_id' => $backId, 'mode' => 'edge', 'edge_node_id' => $edgeId]);
+    $install = null;
+    foreach (Jobs::claimFor($backId) as $x) {
+        if ($x['payload']['domain'] === 'rossi.it') {
+            $install = $x;
+        }
+    }
+    Jobs::complete($install['id'], true, [], 'ok');
+    $edgeJobs = Jobs::claimFor($edgeId);
+    $edgeJob = end($edgeJobs);
+    Jobs::complete($edgeJob['id'], false, ['error' => 'v-add-web-domain'], 'log');
+    $shop = Shops::find($id);
+    eq([$shop['status'], Shops::failedStep($shop)], ['error', 'edge']);
+    Shops::queueEdge($shop);
+    $again = Jobs::claimFor($edgeId);
+    eq([count($again), end($again)['type'], end($again)['payload']['domain']], [1, 'add_edge', 'rossi.it']);
+    [$otherId, $err] = Shops::create(['name' => 'Neri', 'domain' => 'bianchi.it', 'admin_email' => 'b@bianchi.it', 'node_id' => $backId, 'mode' => 'edge', 'edge_node_id' => $edgeId]);
+    eq([(bool)$otherId, Shops::failedStep(Shops::find((int)$otherId))], [true, 'install'], json_encode($err));
+});
+
 t('job bloccati vengono chiusi con errore', function () use ($backId) {
     $id = Jobs::startRunning($backId, 0, 'node_update', []);
     DB::update('jobs', ['started_at' => date('Y-m-d H:i:s', time() - 4000)], 'id = ?', [$id]);

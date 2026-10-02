@@ -9,7 +9,7 @@
   <?php elseif ($shop['status'] === 'suspended'): ?>
   <form method="post" action="<?= e(url('shops/' . $shop['id'] . '/unsuspend')) ?>"><?= csrf_field() ?><button class="btn sm" type="submit">Riattiva</button></form>
   <?php elseif ($shop['status'] === 'error'): ?>
-  <form method="post" action="<?= e(url('shops/' . $shop['id'] . '/retry')) ?>"><?= csrf_field() ?><button class="btn sm" type="submit">Riprova l'installazione</button></form>
+  <form method="post" action="<?= e(url('shops/' . $shop['id'] . '/retry')) ?>"><?= csrf_field() ?><button class="btn sm" type="submit"><?= Hub\Shops::failedStep($shop) === 'edge' ? 'Riprova la pubblicazione sul frontend' : 'Riprova l\'installazione' ?></button></form>
   <?php endif ?></div>
 <?php if ($shop['last_error']): ?><div class="alert error"><?= e($shop['last_error']) ?></div><?php endif ?>
 <?php if ($password): ?><div class="alert info"><strong>Credenziali iniziali dell'admin del negozio</strong><br>Email: <code><?= e($shop['admin_email']) ?></code> · Password: <code><?= e($password) ?></code>

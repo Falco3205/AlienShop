@@ -181,12 +181,7 @@ final class Shops
             }
             DB::update('shops', ['last_error' => ''], 'id = ?', [$shop['id']]);
             if ((int)$shop['edge_node_id'] > 0) {
-                $node = Nodes::find((int)$shop['node_id']);
-                Jobs::queue((int)$shop['edge_node_id'], 'add_edge', [
-                    'shop_id' => (int)$shop['id'], 'domain' => $shop['domain'], 'path' => $shop['path'],
-                    'hestia_user' => $shop['hestia_user'] ?: ((Nodes::find((int)$shop['edge_node_id']) ?? [])['hestia_user'] ?? ''),
-                    'upstream' => $node['upstream'],
-                ], (int)$shop['id']);
+                self::queueEdge($shop);
                 return;
             }
             self::activate((int)$shop['id']);
@@ -206,6 +201,22 @@ final class Shops
         if ($job['type'] === 'unsuspend_shop' && $ok) {
             DB::update('shops', ['status' => 'active'], 'id = ?', [$shop['id']]);
         }
+    }
+
+    public static function queueEdge(array $shop): void
+    {
+        $node = Nodes::find((int)$shop['node_id']);
+        Jobs::queue((int)$shop['edge_node_id'], 'add_edge', [
+            'shop_id' => (int)$shop['id'], 'domain' => $shop['domain'], 'path' => $shop['path'],
+            'hestia_user' => $shop['hestia_user'] ?: ((Nodes::find((int)$shop['edge_node_id']) ?? [])['hestia_user'] ?? ''),
+            'upstream' => $node['upstream'],
+        ], (int)$shop['id']);
+    }
+
+    public static function failedStep(array $shop): string
+    {
+        $type = DB::val("SELECT type FROM jobs WHERE shop_id = ? AND status = 'error' ORDER BY id DESC LIMIT 1", [(int)$shop['id']]);
+        return $type === 'add_edge' && (int)$shop['edge_node_id'] > 0 ? 'edge' : 'install';
     }
 
     private static function activate(int $id): void
