@@ -49,6 +49,30 @@ t('backend senza Hestia: utente, database, pool PHP, Nginx, installazione, cron'
     ok(strpos($log, 'git clone') < strpos($log, 'rm -rf'), 'il clone precede la rimozione di .git');
     ok($r['url'] === 'https://cliente.it' && $r['user'] === $user);
 });
+t('ripetere un\'installazione già completata non tocca file e database, riallinea solo il server', function () use ($base) {
+    $tmp = sys_get_temp_dir() . '/alienshop-base-' . getmypid();
+    $probe = new Node(['hub' => 'http://hub.test', 'token' => 'x', 'role' => 'backend', 'php' => '8.3', 'listen' => '100.101.102.103', 'nginx_user' => 'www-data', 'base' => $tmp], true);
+    [$slug] = $probe->names('cliente.it', '');
+    mkdir("$tmp/shops/$slug/app/config", 0755, true);
+    mkdir("$tmp/shops/$slug/app/storage", 0755, true);
+    touch("$tmp/shops/$slug/app/config/config.php");
+    touch("$tmp/shops/$slug/app/storage/installed.lock");
+    $n = new Node(['hub' => 'http://hub.test', 'token' => 'x', 'role' => 'backend', 'php' => '8.3', 'listen' => '100.101.102.103', 'nginx_user' => 'www-data', 'base' => $tmp], true);
+    $r = $n->installShop($base);
+    $log = implode("\n", $n->log);
+    ok(str_contains($log, 'già installato') && str_contains($log, 'riallineata'), $log);
+    foreach (['git clone', 'mysql', 'bin/console install', 'rm -rf'] as $bad) {
+        ok(!str_contains($log, $bad), "non doveva eseguire: $bad");
+    }
+    ok(str_contains($log, 'pool.d/'), 'il pool PHP va riscritto');
+    ok($r['user'] === 'as_' . $slug);
+    foreach (["$tmp/shops/$slug/app/config/config.php", "$tmp/shops/$slug/app/storage/installed.lock"] as $f) {
+        unlink($f);
+    }
+    foreach (["$tmp/shops/$slug/app/config", "$tmp/shops/$slug/app/storage", "$tmp/shops/$slug/app", "$tmp/shops/$slug", "$tmp/shops", $tmp] as $d) {
+        rmdir($d);
+    }
+});
 t('nomi: utente e database unici per dominio+cartella, entro i limiti di Linux', function () use ($backend) {
     $n = $backend();
     [, $a] = $n->names('cliente.it', '');
@@ -106,6 +130,29 @@ t('frontend (Hestia): proxy, cache, certificato; nessun tunnel', function () use
         $threw = str_contains($e->getMessage(), 'non autorizzato');
     }
     ok($threw);
+});
+t('frontend, sottocartella: solo quella cartella va al backend, il resto del dominio resta a Hestia', function () use ($edge) {
+    $n = $edge();
+    $n->addEdge(['domain' => 'cliente.it', 'path' => 'negozio', 'hestia_user' => 'falco3205', 'upstream' => 'http://100.101.102.103:80']);
+    $log = implode("\n", $n->log);
+    ok(str_contains($log, 'nginx.conf_alienshop_') && str_contains($log, 'nginx.ssl.conf_alienshop_'), 'include di Hestia mancanti');
+    ok(!str_contains($log, 'v-change-web-domain-tpl'), 'il template non va cambiato: il resto del sito è di Hestia');
+    $c = $n->edgeConfig('http://100.101.102.103:80', 'negozio');
+    ok(str_contains($c, 'location ^~ /negozio/ {') && str_contains($c, 'location = /negozio {') && str_contains($c, 'location ^~ /negozio/hub/update {'));
+    ok(!preg_match('/^location \/ \{/m', $c), 'nessuna location / catch-all');
+});
+t('elenco domini di Hestia: legge i domini degli utenti ammessi e indica la cartella dei file', function () {
+    $h = sys_get_temp_dir() . '/hestia-fake-' . getmypid();
+    mkdir("$h/bin", 0755, true);
+    file_put_contents("$h/bin/v-list-web-domains", "#!/bin/sh\n[ \"\$1\" = falco3205 ] && echo '{\"onlyslow.it\":{\"IP\":\"1\"},\"falconefabio.it\":{},\"non valido\":{}}'\n");
+    chmod("$h/bin/v-list-web-domains", 0755);
+    $n = new Node(['hub' => 'http://hub.test', 'token' => 'x', 'role' => 'edge', 'user' => 'falco3205', 'users' => ['falco3205', 'Bad User'], 'hestia' => $h], true);
+    $d = $n->hestiaDomains();
+    ok(count($d) === 2 && $d[0] === ['user' => 'falco3205', 'domain' => 'onlyslow.it', 'root' => '/home/falco3205/web/onlyslow.it/public_html'], json_encode($d));
+    ok(($n->info()['hestia_domains'][1]['domain'] ?? '') === 'falconefabio.it');
+    unlink("$h/bin/v-list-web-domains");
+    rmdir("$h/bin");
+    rmdir($h);
 });
 t('claim da Hestia: solo frontend, utente ammesso, richiesta all\'hub', function () use ($edge, $backend) {
     $calls = [];

@@ -209,6 +209,12 @@ t('pubblicazione sul frontend fallita: si rilancia solo quella, senza reinstalla
     eq([(bool)$otherId, Shops::failedStep(Shops::find((int)$otherId))], [true, 'install'], json_encode($err));
 });
 
+t('domini letti da Hestia dal frontend: elenco per il form del nuovo negozio', function () use ($edgeId) {
+    Nodes::touch($edgeId, ['hestia_domains' => [['user' => 'falco3205', 'domain' => 'onlyslow.it', 'root' => '/home/falco3205/web/onlyslow.it/public_html'], ['bad' => 1]]]);
+    $d = Nodes::hestiaDomains();
+    eq([count($d), $d[0]['domain'], $d[0]['user'], $d[0]['node_id']], [1, 'onlyslow.it', 'falco3205', $edgeId]);
+});
+
 t('job bloccati vengono chiusi con errore', function () use ($backId) {
     $id = Jobs::startRunning($backId, 0, 'node_update', []);
     DB::update('jobs', ['started_at' => date('Y-m-d H:i:s', time() - 4000)], 'id = ?', [$id]);

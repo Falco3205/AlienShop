@@ -94,4 +94,18 @@ final class Nodes
     {
         return json_decode((string)$node['info'], true) ?: [];
     }
+
+    public static function hestiaDomains(): array
+    {
+        $out = [];
+        foreach (self::byRole('edge') as $edge) {
+            foreach ((array)(self::info($edge)['hestia_domains'] ?? []) as $d) {
+                if (is_array($d) && isset($d['user'], $d['domain'], $d['root'])) {
+                    $out[] = ['node_id' => (int)$edge['id'], 'node' => (string)$edge['name'], 'user' => (string)$d['user'], 'domain' => (string)$d['domain'], 'root' => (string)$d['root']];
+                }
+            }
+        }
+        usort($out, static fn($a, $b) => strcmp($a['domain'], $b['domain']));
+        return $out;
+    }
 }

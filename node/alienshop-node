@@ -73,11 +73,41 @@ class Node
         if (is_readable($conf) && preg_match('/^VERSION=[\'"]?([\d.]+)/m', (string)file_get_contents($conf), $m)) {
             $hestia = $m[1];
         }
+        $domains = ($this->cfg['role'] ?? '') === 'edge' ? $this->hestiaDomains() : [];
         return [
             'hostname' => gethostname() ?: '', 'os' => php_uname('s') . ' ' . php_uname('r'), 'php' => PHP_VERSION, 'agent' => AGENT_VERSION,
             'hestia' => $hestia, 'load' => round((sys_getloadavg()[0] ?? 0), 2),
             'disk_used_pct' => $disk ? (int)round(100 - disk_free_space('/') / $disk * 100) : 0, 'mem_used_pct' => $mem,
-        ];
+        ] + ($domains ? ['hestia_domains' => $domains] : []);
+    }
+
+    public function hestiaDomains(): array
+    {
+        $out = [];
+        foreach ($this->cfg['users'] ?: [$this->cfg['user'] ?? ''] as $user) {
+            if (!is_string($user) || !preg_match('/^[a-z][a-z0-9_-]{0,31}$/D', $user)) {
+                continue;
+            }
+            $json = $this->capture([$this->cfg['hestia'] . '/bin/v-list-web-domains', $user, 'json']);
+            foreach (array_keys(json_decode($json, true) ?: []) as $domain) {
+                if (is_string($domain) && preg_match('/^(?=.{4,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,24}$/D', $domain)) {
+                    $out[] = ['user' => $user, 'domain' => $domain, 'root' => "/home/$user/web/$domain/public_html"];
+                }
+            }
+        }
+        return array_slice($out, 0, 300);
+    }
+
+    private function capture(array $cmd): string
+    {
+        $proc = @proc_open($cmd, [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, null, ['PATH' => '/usr/local/hestia/bin:/usr/sbin:/usr/bin:/sbin:/bin', 'HESTIA' => $this->cfg['hestia']]);
+        if (!is_resource($proc)) {
+            return '';
+        }
+        $out = (string)stream_get_contents($pipes[1]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        return proc_close($proc) === 0 ? $out : '';
     }
 
     public function run(): int
@@ -282,23 +312,29 @@ class Node
         $this->sh(['usermod', '-aG', $user, $nginxUser]);
         $this->sh(['install', '-d', '-o', $user, '-g', $user, '-m', '0750', $home, "$home/tmp"]);
 
-        $reuse = is_dir("$app/.git") && !is_file("$app/config/config.php");
-        if (!$reuse && !$this->emptyish($app)) {
-            throw new RuntimeException("La cartella $app contiene già dei file: non la sovrascrivo.");
-        }
-        if ($reuse) {
-            $this->sh(['git', '-C', $app, 'pull', '--ff-only'], $user);
+        $installed = is_file("$app/config/config.php") && is_file("$app/storage/installed.lock");
+        $dbPass = '';
+        if ($installed) {
+            $this->say('Negozio già installato in questa cartella: riallineo solo la configurazione del server.');
         } else {
-            $this->sh(['git', 'clone', '--depth', '1', '-b', $p['branch'], 'https://github.com/' . $p['repo'] . '.git', $app], $user);
-        }
-        $this->write("$app/storage/install.key", bin2hex(random_bytes(16)), 0640, $user);
+            $reuse = is_dir("$app/.git") && !is_file("$app/config/config.php");
+            if (!$reuse && !$this->emptyish($app)) {
+                throw new RuntimeException("La cartella $app contiene già dei file: non la sovrascrivo.");
+            }
+            if ($reuse) {
+                $this->sh(['git', '-C', $app, 'pull', '--ff-only'], $user);
+            } else {
+                $this->sh(['git', 'clone', '--depth', '1', '-b', $p['branch'], 'https://github.com/' . $p['repo'] . '.git', $app], $user);
+            }
+            $this->write("$app/storage/install.key", bin2hex(random_bytes(16)), 0640, $user);
 
-        $dbPass = bin2hex(random_bytes(12));
-        $this->redact[] = $dbPass;
-        $this->sh(['mysql', '--batch'], null, [], true, "CREATE DATABASE IF NOT EXISTS `$user` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;\n"
-            . "CREATE USER IF NOT EXISTS '$user'@'localhost' IDENTIFIED BY '$dbPass';\n"
-            . "ALTER USER '$user'@'localhost' IDENTIFIED BY '$dbPass';\n"
-            . "GRANT ALL PRIVILEGES ON `$user`.* TO '$user'@'localhost';\nFLUSH PRIVILEGES;\n");
+            $dbPass = bin2hex(random_bytes(12));
+            $this->redact[] = $dbPass;
+            $this->sh(['mysql', '--batch'], null, [], true, "CREATE DATABASE IF NOT EXISTS `$user` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;\n"
+                . "CREATE USER IF NOT EXISTS '$user'@'localhost' IDENTIFIED BY '$dbPass';\n"
+                . "ALTER USER '$user'@'localhost' IDENTIFIED BY '$dbPass';\n"
+                . "GRANT ALL PRIVILEGES ON `$user`.* TO '$user'@'localhost';\nFLUSH PRIVILEGES;\n");
+        }
 
         $written = [];
         try {
@@ -340,6 +376,11 @@ class Node
                 }
             }
             throw $e;
+        }
+
+        if ($installed) {
+            $this->say('== Configurazione del server riallineata');
+            return ['url' => $p['url'], 'database' => $user, 'user' => $user];
         }
 
         $env = ['ALIEN_ADMIN_PASSWORD' => $p['admin_password'], 'ALIEN_DB_PASS' => $dbPass, 'ALIEN_HUB_SECRET' => $p['hub_secret'], 'ALIEN_HUB_URL' => $p['hub_url']];
@@ -451,12 +492,17 @@ NGX;
 
     public function addEdge(array $p): array
     {
-        $this->validate($p, ['domain' => 'domain', 'hestia_user' => 'user', 'upstream' => 'upstream']);
+        $p += ['path' => ''];
+        $this->validate($p, ['domain' => 'domain', 'hestia_user' => 'user', 'upstream' => 'upstream', 'path' => 'path']);
         $user = $p['hestia_user'];
         $domain = $p['domain'];
-        $this->say("== Pubblicazione di $domain tramite frontend");
-        $this->ensureTemplate();
+        $path = (string)($p['path'] ?? '');
+        $this->say("== Pubblicazione di $domain" . ($path ? "/$path" : '') . ' tramite frontend');
         [$exists] = $this->hestia('v-list-web-domain', [$user, $domain], false);
+        if ($path !== '') {
+            return $this->addEdgeFolder($user, $domain, $path, $p['upstream'], $exists === 0);
+        }
+        $this->ensureTemplate();
         if ($exists !== 0 || $this->dry) {
             $this->hestia('v-add-web-domain', [$user, $domain]);
         }
@@ -471,6 +517,29 @@ NGX;
         $this->hestia('v-restart-web', [], false);
         $this->say('== Frontend pronto');
         return ['upstream' => $p['upstream']];
+    }
+
+    private function addEdgeFolder(string $user, string $domain, string $path, string $upstream, bool $exists): array
+    {
+        if (!$exists) {
+            $this->hestia('v-add-web-domain', [$user, $domain]);
+        }
+        $this->write('/etc/nginx/conf.d/alienshop-cache.conf', "proxy_cache_path /var/cache/nginx/alienshop levels=1:2 keys_zone=alienshop:50m max_size=2g inactive=7d use_temp_path=off;\n");
+        if (!$this->dry) {
+            @mkdir('/var/cache/nginx/alienshop', 0755, true);
+        }
+        $conf = $this->edgeConfig($upstream, $path);
+        [$slug] = $this->names($domain, $path);
+        $dir = "/home/$user/conf/web/$domain";
+        $this->write("$dir/nginx.conf_alienshop_$slug", $conf, 0644);
+        $this->write("$dir/nginx.ssl.conf_alienshop_$slug", $conf, 0644);
+        if (!$exists) {
+            $this->hestia('v-add-letsencrypt-domain', [$user, $domain], false);
+            $this->hestia('v-add-web-domain-ssl-force', [$user, $domain], false);
+        }
+        $this->hestia('v-restart-web', [], false);
+        $this->say("== Frontend pronto: il resto di $domain resta servito da Hestia");
+        return ['upstream' => $upstream];
     }
 
     private function ensureTemplate(): void
@@ -491,7 +560,7 @@ NGX;
         $this->write('/etc/nginx/conf.d/alienshop-cache.conf', "proxy_cache_path /var/cache/nginx/alienshop levels=1:2 keys_zone=alienshop:50m max_size=2g inactive=7d use_temp_path=off;\n");
     }
 
-    public function edgeConfig(string $upstream): string
+    public function edgeConfig(string $upstream, string $path = ''): string
     {
         $common = <<<NGX
     proxy_pass $upstream;
@@ -504,6 +573,33 @@ NGX;
     proxy_set_header Connection "";
     proxy_connect_timeout 5s;
 NGX;
+        if ($path !== '') {
+            return <<<NGX
+client_max_body_size 64m;
+location ^~ /$path/hub/update {
+$common
+    proxy_read_timeout 700s;
+    proxy_cache off;
+}
+location ^~ /$path/ {
+$common
+    proxy_read_timeout 120s;
+    proxy_cache alienshop;
+    proxy_cache_key "\$scheme\$host\$request_uri";
+    proxy_cache_bypass \$cookie_as_admin;
+    proxy_no_cache \$cookie_as_admin;
+    proxy_cache_lock on;
+    proxy_cache_use_stale error timeout updating http_500 http_502 http_503 http_504;
+    add_header X-Edge-Cache \$upstream_cache_status always;
+}
+location = /$path {
+$common
+    proxy_read_timeout 120s;
+    proxy_cache off;
+}
+
+NGX;
+        }
         return <<<NGX
 client_max_body_size 64m;
 location ~ /hub/update\$ {

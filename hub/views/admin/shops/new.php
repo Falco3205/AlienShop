@@ -4,7 +4,11 @@
 <div class="grid2"><div>
 <div class="card"><h2>Il negozio</h2>
 <?= a_input('name', 'Nome del negozio', $in['name'], 'text', ['required' => true]) ?>
-<?= a_input('domain', 'Dominio', $in['domain'], 'text', ['required' => true, 'placeholder' => 'negozio.cliente.it'], 'Il dominio deve già puntare al server (record A). Se non esiste in Hestia lo crea l\'agente.') ?>
+<?php if ($hestiaDomains): ?>
+<?php $opts = ['' => '— scegli un dominio già presente in Hestia —']; foreach ($hestiaDomains as $d) { $opts[$d['node_id'] . '|' . $d['user'] . '|' . $d['domain']] = $d['domain'] . ' — utente ' . $d['user'] . ' — ' . $d['root']; } ?>
+<?= a_select('hestia_domain', 'Dominio di Hestia', $opts, $_POST['hestia_domain'] ?? '', 'Elenco letto da Hestia sul server frontend. Con una sottocartella, il resto del sito resta quello di Hestia; solo la cartella scelta va al negozio sul backend.') ?>
+<?php endif ?>
+<?= a_input('domain', $hestiaDomains ? 'Oppure un dominio nuovo' : 'Dominio', $in['domain'], 'text', ['placeholder' => 'negozio.cliente.it'], 'Un dominio nuovo deve puntare al frontend (record A) e viene creato in Hestia dall\'agente.') ?>
 <div class="field"><label>Dove installarlo</label>
 <label class="check"><input type="radio" name="location" value="root" <?= $in['location'] === 'root' ? 'checked' : '' ?>> Nella cartella principale del dominio (https://dominio/)</label>
 <label class="check"><input type="radio" name="location" value="sub" <?= $in['location'] === 'sub' ? 'checked' : '' ?>> In una sottocartella (https://dominio/<strong>cartella</strong>) — il resto del sito resta com'è</label></div>

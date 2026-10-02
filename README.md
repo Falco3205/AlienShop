@@ -173,9 +173,13 @@ L'elenco "Quick Install App" di Hestia (quello con WordPress) **non è stato imp
 
 **B · Manuale, dall'hub (anche per sottocartelle)**
 
-Hub → **Negozi → Nuovo negozio**: dominio, nome, email dell'amministratore, tema, lingua; **dove installarlo** (cartella principale o sottocartella); **Server backend**; **Pubblicazione** *Tramite frontend*. Il resto è come sopra.
+Hub → **Negozi → Nuovo negozio**: scegli il **dominio dall'elenco letto da Hestia** (con utente e cartella dei file, es. `/home/falco3205/web/onlyslow.it/public_html`) oppure scrivine uno nuovo (lo crea l'agente in Hestia); nome, email dell'amministratore, tema (con anteprima), lingua; **dove installarlo** (cartella principale o sottocartella); **Server backend**; **Pubblicazione** *Tramite frontend*.
 
-Sottocartella: il negozio risponde su `dominio.it/cartella`; il resto del dominio mostra una pagina segnaposto che puoi sostituire con i file del sito del cliente in `/var/www/alienshop/sites/dominio.it/` sul backend.
+- **Cartella principale**: il dominio passa al template `alienshop-edge` e tutto va al negozio.
+- **Sottocartella**: il template di Hestia **non cambia**. Il sito esistente in `public_html` (WordPress, pagine…) resta servito da Hestia; solo `dominio.it/cartella` viene inoltrato al negozio sul backend, con due file di configurazione `nginx.conf_alienshop_*` e `nginx.ssl.conf_alienshop_*` nella cartella `conf/web/dominio` dell'utente Hestia.
+- Il negozio vero e proprio (codice, database) sta sempre sul backend; su Hestia resta solo la configurazione del proxy.
+
+Se un lavoro fallisce, nella scheda del negozio compare il tasto per riprovare solo il passaggio fallito; ripetere un'installazione già completata riallinea soltanto la configurazione del server, senza toccare file e database.
 
 Se Cloudflare mostra errore 526, il certificato sul frontend non c'è (il dominio non puntava ancora a Cloudflare quando è partita la pubblicazione): crea un **certificato di origine** (Cloudflare: *SSL/TLS → Origin Server → Create Certificate*), salva `dominio.it.crt` e `dominio.it.key` in `/root/ssl/dominio.it/` sul frontend e lancia:
 

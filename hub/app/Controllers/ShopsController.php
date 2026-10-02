@@ -36,7 +36,19 @@ final class ShopsController extends Controller
             if ($in['location'] === 'root') {
                 $in['path'] = '';
             }
+            $hestiaUser = '';
+            foreach (Nodes::hestiaDomains() as $d) {
+                if ($req->str('hestia_domain') === $d['node_id'] . '|' . $d['user'] . '|' . $d['domain']) {
+                    $in['domain'] = $d['domain'];
+                    $in['mode'] = 'edge';
+                    $in['edge_node_id'] = $d['node_id'];
+                    $hestiaUser = $d['user'];
+                }
+            }
             [$id, $errors] = Shops::create($in);
+            if ($id && $hestiaUser !== '') {
+                DB::update('shops', ['hestia_user' => $hestiaUser], 'id = ?', [$id]);
+            }
             if ($id) {
                 return $this->back('shops/' . $id, 'Negozio messo in coda: il server lo installa entro un minuto.');
             }
@@ -49,6 +61,7 @@ final class ShopsController extends Controller
             'errors' => $errors,
             'backends' => Nodes::byRole('backend'),
             'edges' => Nodes::byRole('edge'),
+            'hestiaDomains' => Nodes::hestiaDomains(),
             'themes' => $themes,
         ], 'shops');
     }
