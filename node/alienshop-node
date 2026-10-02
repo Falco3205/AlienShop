@@ -1,4 +1,4 @@
-#!/usr/bin/env php
+#!/usr/bin/env -S php -d disable_functions=
 <?php
 declare(strict_types=1);
 
